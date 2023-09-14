@@ -1,0 +1,147 @@
+// yaml config parser to get values for s3 binary cache bucket path,
+		// s3 build base dir, module installation location, module
+		// dependencies and core URL: 30mins
+		binaryCache := "s3://spack"
+		buildBase := "spack/builds/"
+		moduleInstallDir := "/software/modules/HGI/softpack"
+		moduleLoadPath := "HGI/softpack"
+		moduleDependencies := "/software/modules/ISG/singularity/3.10.0"
+		coreURL := "http://x.y.z:9837/graphql"
+
+// server that listens for the post from core (or direct from front-end)
+		// and gets following details about the desired build: 1hr
+		envPath := "users/user"
+		envName := "myenv"
+		def := &Definition{
+			EnvironmentPath: envPath,
+			EnvironmentName: envName,
+			Description:     "some nice help text",
+			Packages: []Package{
+				{Name: "xxhash", Version: "0.8.1", Exe: "xxhsum"},
+			},
+		}
+
+		// generate a singularity definition file based on a template: 1hr
+		spackSingularityDef := CreateSingularityDef(def, binaryCache)
+
+		So(spackSingularityDef, ShouldEqual, `
+Bootstrap: docker
+From: spack/ubuntu-jammy:latest
+Stage: build
+
+%files
+	/home/ubuntu/.aws /root/.aws
+	/home/ubuntu/spack/opt/spack/gpg /opt/spack/opt/spack/gpg
+
+%post
+	# Create the manifest file for the installation in /opt/spack-environment
+	mkdir /opt/spack-environment && cd /opt/spack-environment
+	cat << EOF > spack.yaml
+spack:
+	# add package specs to the specs list
+	specs:
+	- xxhash@0.8.1
+	view: /opt/view
+	concretizer:
+	unify: true
+	config:
+	install_tree: /opt/software
+EOF
+
+	# Install all the required software
+	. /opt/spack/share/spack/setup-env.sh
+	spack mirror add develop https://binaries.spack.io/develop
+	spack mirror add s3cache s3://spack
+	spack buildcache keys --install --trust
+	spack config add "config:install_tree:padded_length:128"
+	spack -e . concretize
+	spack -e . install
+	spack -e . buildcache push --rebuild-index -f s3cache
+	spack gc -y
+	spack env activate --sh -d . >> /opt/spack-environment/environment_modifications.sh
+
+	# Strip the binaries to reduce the size of the image
+	find -L /opt/view/* -type f -exec readlink -f '{}' \; | \
+	xargs file -i | \
+	grep 'charset=binary' | \
+	grep 'x-executable\|x-archive\|x-sharedlib' | \
+	awk -F: '{print $1}' | xargs strip
+
+Bootstrap: docker
+From: ubuntu:22.04
+Stage: final
+
+%files from build
+	/opt/spack-environment /opt
+	/opt/software /opt
+	/opt/._view /opt
+	/opt/view /opt
+	/opt/spack-environment/environment_modifications.sh /opt/spack-environment/environment_modifications.sh
+
+%post
+	# Modify the environment without relying on sourcing shell specific files at startup
+	cat /opt/spack-environment/environment_modifications.sh >> $SINGULARITY_ENVIRONMENT
+`)
+
+		s3Path := buildBase + envPath + "/" + envName
+
+		// put the .def file in S3 so it can be seen in OpenStack: 30mins
+		err := WriteSingularityDefToS3(spackSingularityDef, s3Path)
+		So(err, ShouldBeNil)
+
+		// generate a wr input line based on a template: 30mins
+		wrInput := GenerateWRAddInput(s3Path)
+		So(wrInput, ShouldEqual, `{"cmd": "sudo singularity build --force singularity.sif singularity.def", `+
+			`"retries": 0, "rep_grp": "singularity_build", "limit_grps": ["s3cache"], `+
+			`"mounts_json": [{"Targets": [{"Path":"spack/builds/users/user/myenv","Write":true,"Cache":true}]}]`)
+
+		// pipe above input to `wr add`, then wait for wr job to complete: 2hrs
+		err = RunBuildJob(wrInput)
+		So(err, ShouldBeNil)
+
+		// create a module file based on a template: 1hr
+		moduleFileData := CreateModuleFile(def, moduleDependencies)
+		So(moduleFileData, ShouldEqual, `
+#%Module
+
+proc ModulesHelp { } {
+    puts stderr "some nice help text"
+}
+
+module-whatis "Name: xxhash"
+module-whatis "Version: 0.8.1"
+
+module load /software/modules/ISG/singularity/3.10.0
+
+set-alias xxhsum singularity run xxhsum
+`)
+
+		// create a README.md file based on a template: 1hr
+		readmeFileData := CreateReadmeFile(def, moduleLoadPath)
+		So(readmeFileData, ShouldEqual, `
+# Usage
+
+module load HGI/softpack/xxhash/0.8.1
+`)
+
+		// get artifacts (the image and lock file) from s3: 1hr
+		imageData, lockData, err := GetArtifactsFromS3(s3Path)
+		So(err, ShouldBeNil)
+
+		// install module file and image to /software: 30min
+		err = InstallModule(moduleInstallDir, def, moduleFileData, imageData)
+		So(err, ShouldBeNil)
+
+		// interpret the lock file to generate a softpack.yml with versions,
+		// based on a template: 2hr
+		versionedSoftpackYMLData, err := SpackLockToSoftPackYML(lockData)
+		So(err, ShouldBeNil)
+
+		// push artifacts to git repo via core: 2hr
+		err = AddArtifactsToRepo(coreURL, def, imageData, lockData,
+			spackSingularityDef, moduleFileData, readmeFileData,
+			versionedSoftpackYMLData)
+		So(err, ShouldBeNil)
+
+		// Replicate current python builder functionality: 6hr == 1-3 days
+		// Total: 13hr == 2 days to 1 week
