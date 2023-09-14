@@ -1,0 +1,71 @@
+/*******************************************************************************
+ * Copyright (c) 2023 Genome Research Ltd.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining
+ * a copy of this software and associated documentation files (the
+ * "Software"), to deal in the Software without restriction, including
+ * without limitation the rights to use, copy, modify, merge, publish,
+ * distribute, sublicense, and/or sell copies of the Software, and to
+ * permit persons to whom the Software is furnished to do so, subject to
+ * the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included
+ * in all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+ * IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+ * CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+ * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+ * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ ******************************************************************************/
+
+package config
+
+import (
+	"fmt"
+	"io"
+	"net/url"
+
+	yaml "gopkg.in/yaml.v3"
+)
+
+type Config struct {
+	S3 struct {
+		BinaryCache string `yaml:"binaryCache"`
+		BuildBase   string `yaml:"buildBase"`
+	} `yaml:"s3"`
+	Module struct {
+		InstallDir   string   `yaml:"installDir"`
+		LoadPath     string   `yaml:"loadPath"`
+		Dependencies []string `yaml:"dependencies"`
+	} `yaml:"module"`
+	CustomSpackRepo struct {
+		URL    string `yaml:"url"`
+		Commit string `yaml:"commit"`
+	} `yaml:"customSpackRepo"`
+	CoreURL   string `yaml:"coreURL"`
+	ListenURL string `yaml:"listenURL"`
+}
+
+func Parse(r io.Reader) (*Config, error) {
+	c := new(Config)
+	if err := yaml.NewDecoder(r).Decode(c); err != nil {
+		return nil, err
+	}
+
+	if c.CustomSpackRepo.URL != "" {
+		if _, err := url.Parse(c.CustomSpackRepo.URL); err != nil {
+			return nil, fmt.Errorf("invalid customSpackRepo.url: %w", err)
+		}
+	}
+
+	if c.CoreURL != "" {
+		if _, err := url.Parse(c.CustomSpackRepo.URL); err != nil {
+			return nil, fmt.Errorf("invalid coreURL: %w", err)
+		}
+	}
+
+	return c, nil
+}
