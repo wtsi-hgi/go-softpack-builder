@@ -1,0 +1,16 @@
+s3:
+  binaryCache: "spack"
+  buildBase: "spack/builds"
+
+module:
+  installDir:  "/software/modules/HGI/softpack"
+  loadPath: "HGI/softpack"
+  dependencies:
+    - "/software/modules/ISG/singularity/3.10.0"
+
+customSpackRepo:
+  url: "https://github.com/org/spack"
+  commit: "aaaaaaa"
+
+coreURL: "http://x.y.z:9837/graphql"
+listenURL: "localhost:2456"

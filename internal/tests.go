@@ -21,32 +21,11 @@
  * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  ******************************************************************************/
 
-package config
+package internal
 
 import (
-	"testing"
-
-	. "github.com/smartystreets/goconvey/convey"
-
-	"github.com/wtsi-hgi/go-softpack-builder/internal"
+	"embed"
 )
 
-func TestConfig(t *testing.T) {
-	Convey("Given a yaml config file, it can be Parse()d", t, func() {
-		configData, err := internal.TestData.Open("testdata/config.yml")
-		So(err, ShouldBeNil)
-
-		config, err := Parse(configData)
-		So(err, ShouldBeNil)
-
-		So(config.S3.BinaryCache, ShouldEqual, "spack")
-		So(config.S3.BuildBase, ShouldEqual, "spack/builds")
-		So(config.Module.InstallDir, ShouldEqual, "/software/modules/HGI/softpack")
-		So(config.Module.LoadPath, ShouldEqual, "HGI/softpack")
-		So(config.Module.Dependencies, ShouldResemble, []string{"/software/modules/ISG/singularity/3.10.0"})
-		So(config.CustomSpackRepo.URL, ShouldEqual, "https://github.com/org/spack")
-		So(config.CustomSpackRepo.Commit, ShouldEqual, "aaaaaaa")
-		So(config.CoreURL, ShouldEqual, "http://x.y.z:9837/graphql")
-		So(config.ListenURL, ShouldEqual, "localhost:2456")
-	})
-}
+//go:embed testdata
+var TestData embed.FS
