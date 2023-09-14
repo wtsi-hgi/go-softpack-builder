@@ -1,0 +1,60 @@
+Bootstrap: docker
+From: spack/ubuntu-jammy:latest
+Stage: build
+
+%files
+	/home/ubuntu/.aws /root/.aws
+	/home/ubuntu/spack/opt/spack/gpg /opt/spack/opt/spack/gpg
+
+%post
+	# Create the manifest file for the installation in /opt/spack-environment
+	mkdir /opt/spack-environment && cd /opt/spack-environment
+	cat << EOF > spack.yaml
+spack:
+	# add package specs to the specs list
+	specs:{{ range .Packages }}
+	- {{ .Name }}{{ if ne .Version "" }}@{{ .Version }}{{ end }}{{ end }}
+	view: /opt/view
+	concretizer:
+		unify: true
+	config:
+		install_tree: /opt/software
+EOF
+
+	# Install all the required software
+	. /opt/spack/share/spack/setup-env.sh
+	spack mirror add develop https://binaries.spack.io/develop
+	spack mirror add s3cache "{{ .BuildCache }}"
+	tmpDir="$(mktemp -d)"
+	git clone "{{ .RepoURL }}" "$tmpDir"
+	git -C "$tmpDir" checkout "{{ .RepoRef }}"
+	spack repo add "$tmpDir"
+	spack buildcache keys --install --trust
+	spack config add "config:install_tree:padded_length:128"
+	spack -e . concretize
+	spack -e . install
+	spack -e . buildcache push --rebuild-index -f s3cache
+	spack gc -y
+	spack env activate --sh -d . >> /opt/spack-environment/environment_modifications.sh
+
+	# Strip the binaries to reduce the size of the image
+	find -L /opt/view/* -type f -exec readlink -f '{}' \; | \
+	xargs file -i | \
+	grep 'charset=binary' | \
+	grep 'x-executable\|x-archive\|x-sharedlib' | \
+	awk -F: '{print $1}' | xargs strip
+
+Bootstrap: docker
+From: ubuntu:22.04
+Stage: final
+
+%files from build
+	/opt/spack-environment /opt
+	/opt/software /opt
+	/opt/._view /opt
+	/opt/view /opt
+	/opt/spack-environment/environment_modifications.sh /opt/spack-environment/environment_modifications.sh
+
+%post
+	# Modify the environment without relying on sourcing shell specific files at startup
+	cat /opt/spack-environment/environment_modifications.sh >> $SINGULARITY_ENVIRONMENT
