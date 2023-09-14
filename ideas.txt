@@ -52,6 +52,10 @@ EOF
 	. /opt/spack/share/spack/setup-env.sh
 	spack mirror add develop https://binaries.spack.io/develop
 	spack mirror add s3cache s3://spack
+	tmpDir="$(mktemp -d)"
+	git clone https://repoURL "$tmpDir";
+	spack repo add "$tmpDir";
+	git -C "$tmpDir" checkout "HASH"
 	spack buildcache keys --install --trust
 	spack config add "config:install_tree:padded_length:128"
 	spack -e . concretize
