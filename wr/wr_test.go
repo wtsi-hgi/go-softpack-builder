@@ -24,7 +24,11 @@
 package wr
 
 import (
+	"bytes"
+	"crypto/rand"
+	"fmt"
 	"os"
+	"os/exec"
 	"testing"
 	"time"
 
@@ -40,7 +44,7 @@ func TestWR(t *testing.T) {
 		envName := "myenv"
 		s3Path := buildBase + envPath + "/" + envName
 
-		wrInput, err := GenerateWRAddInput(s3Path)
+		wrInput, err := SingularityBuildInS3WRInput(s3Path)
 		So(err, ShouldBeNil)
 		So(wrInput, ShouldEqual, `{"cmd": "echo doing build in spack/builds/users/user/myenv; sudo singularity build --force singularity.sif singularity.def", `+
 			`"retries": 0, "rep_grp": "singularity_build-spack/builds/users/user/myenv", "limit_grps": ["s3cache"], `+
@@ -57,8 +61,37 @@ func TestWR(t *testing.T) {
 	Convey("You can run a WR command", t, func() {
 		now := time.Now()
 
-		err := Run("sleep 2s")
+		runner := New("development")
+
+		runArgs, repGrp := uniqueRunArgs("sleep 2s")
+		err := runner.Run(runArgs)
 		So(err, ShouldBeNil)
 		So(time.Since(now), ShouldBeGreaterThan, 2*time.Second)
+
+		cmd := exec.Command("wr", "status", "--deployment", runner.deployment, "-i", repGrp, "-o", "json")
+		var stdout bytes.Buffer
+		var stderr bytes.Buffer
+		cmd.Stdout = &stdout
+		cmd.Stderr = &stderr
+
+		err = cmd.Run()
+		So(err, ShouldBeNil)
+		So(stderr.String(), ShouldBeBlank)
+		So(stdout.String(), ShouldContainSubstring, `"State":"complete"`)
+
+		runArgs, _ = uniqueRunArgs("false")
+		err = runner.Run(runArgs)
+		So(err, ShouldNotBeNil)
+		So(err.Error(), ShouldEqual, "exit status 1")
 	})
+}
+
+func uniqueRunArgs(cmd string) (string, string) {
+	b := make([]byte, 16)
+	n, err := rand.Read(b)
+	So(n, ShouldEqual, 16)
+	So(err, ShouldBeNil)
+	repGrp := fmt.Sprintf("%x", b)
+
+	return `{"cmd":"` + cmd + ` && echo ` + repGrp + `", "rep_grp": "` + repGrp + `", "retries": 0}`, repGrp
 }

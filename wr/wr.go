@@ -24,7 +24,10 @@
 package wr
 
 import (
+	"bytes"
 	_ "embed"
+	"errors"
+	"os/exec"
 	"strings"
 	"text/template"
 )
@@ -37,7 +40,7 @@ func init() {
 	wrTmpl = template.Must(template.New("").Parse(wrTmplStr))
 }
 
-func GenerateWRAddInput(s3Path string) (string, error) {
+func SingularityBuildInS3WRInput(s3Path string) (string, error) {
 	var w strings.Builder
 
 	if err := wrTmpl.Execute(&w, s3Path); err != nil {
@@ -47,6 +50,29 @@ func GenerateWRAddInput(s3Path string) (string, error) {
 	return w.String(), nil
 }
 
-func Run(cmd string) error {
+type Runner struct {
+	deployment string
+}
+
+func New(deployment string) *Runner {
+	return &Runner{deployment: deployment}
+}
+
+func (r *Runner) Run(wrInput string) error {
+	cmd := exec.Command("wr", "add", "--deployment", r.deployment, "--sync", "--time", "8h", "--memory", "8G")
+	cmd.Stdin = strings.NewReader(wrInput)
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+
+	err := cmd.Run()
+	if err != nil {
+		errStr := stderr.String()
+		if errStr == "" {
+			errStr = err.Error()
+		}
+
+		return errors.New(errStr)
+	}
+
 	return nil
 }
