@@ -21,10 +21,12 @@
  * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  ******************************************************************************/
 
-package spack
+package wr
 
 import (
+	"os"
 	"testing"
+	"time"
 
 	. "github.com/smartystreets/goconvey/convey"
 )
@@ -43,5 +45,20 @@ func TestWR(t *testing.T) {
 		So(wrInput, ShouldEqual, `{"cmd": "echo doing build in spack/builds/users/user/myenv; sudo singularity build --force singularity.sif singularity.def", `+
 			`"retries": 0, "rep_grp": "singularity_build-spack/builds/users/user/myenv", "limit_grps": ["s3cache"], `+
 			`"mounts_json": [{"Targets": [{"Path":"spack/builds/users/user/myenv","Write":true,"Cache":true}]}]`)
+	})
+
+	gsbWR := os.Getenv("GSB_WR_TEST")
+	if gsbWR == "" {
+		SkipConvey("Skipping WR run test, set GSB_WR_TEST to enable", t, func() {})
+
+		return
+	}
+
+	Convey("You can run a WR command", t, func() {
+		now := time.Now()
+
+		err := Run("sleep 2s")
+		So(err, ShouldBeNil)
+		So(time.Since(now), ShouldBeGreaterThan, 2*time.Second)
 	})
 }

@@ -21,7 +21,7 @@
  * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  ******************************************************************************/
 
-package spack
+package wr
 
 import (
 	_ "embed"
@@ -45,4 +45,8 @@ func GenerateWRAddInput(s3Path string) (string, error) {
 	}
 
 	return w.String(), nil
+}
+
+func Run(cmd string) error {
+	return nil
 }
