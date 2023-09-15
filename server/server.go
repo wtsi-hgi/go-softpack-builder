@@ -37,8 +37,9 @@ type Builder interface {
 }
 
 type request struct {
-	Name  string
-	Model struct {
+	Name    string
+	Version string
+	Model   struct {
 		Description string
 		Packages    []spack.Package
 	}
@@ -58,6 +59,7 @@ func New(b Builder) http.Handler {
 
 		def := new(spack.Definition)
 		def.EnvironmentPath, def.EnvironmentName = path.Split(req.Name)
+		def.EnvironmentVersion = req.Version
 		def.Description = req.Model.Description
 		def.Packages = req.Model.Packages
 

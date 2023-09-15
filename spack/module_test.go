@@ -21,61 +21,35 @@
  * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  ******************************************************************************/
 
-package server
+package spack
 
 import (
-	"net/http"
-	"net/http/httptest"
-	"strings"
+	"fmt"
 	"testing"
 
 	. "github.com/smartystreets/goconvey/convey"
-
-	"github.com/wtsi-hgi/go-softpack-builder/spack"
 )
 
-type mockBuilder struct {
-	received *spack.Definition
+func TestModule(t *testing.T) {
+	Convey("Given a Definition, you can generate a module file", t, func() {
+		// moduleLoadPath would come from our config yml
+		moduleLoadPath := "/software/modules/ISG/singularity/3.10.0"
+
+		def := getExampleDefinition()
+		moduleFileData := def.ToModule([]string{moduleLoadPath})
+		So(moduleFileData, ShouldEqual, fmt.Sprintf(`#%%Module
+
+proc ModulesHelp { } {
+	puts stderr "%s"
 }
 
-func (m *mockBuilder) Build(def *spack.Definition) error {
-	m.received = def
-	return nil
-}
+module-whatis "Name: %s"
+module-whatis "Version: %s"
+module-whatis "Packages: xxhash@0.8.1, r-seurat@4"
 
-func TestServer(t *testing.T) {
-	Convey("Given a mock Builder and test http server, core posts result in a Definition being sent to Build()", t, func() {
-		mb := new(mockBuilder)
+module load %s
 
-		handler := New(mb)
-		server := httptest.NewServer(handler)
-		So(server, ShouldNotBeNil)
-
-		resp, err := server.Client().Post(server.URL+"/environments/build", "application/json",
-			strings.NewReader(`
-{
-	"name": "users/user/myenv",
-	"version": "0.8.1",
-	"model": {
-		"description": "help text",
-		"packages": [{"name": "xxhash", "version": "0.8.1", "exe": "xxhsum"}]
-	}
-}
-`))
-		So(err, ShouldBeNil)
-		So(resp.StatusCode, ShouldEqual, http.StatusOK)
-		So(mb.received, ShouldResemble, &spack.Definition{
-			EnvironmentPath:    "users/user/",
-			EnvironmentName:    "myenv",
-			EnvironmentVersion: "0.8.1",
-			Description:        "help text",
-			Packages: []spack.Package{
-				{
-					Name:    "xxhash",
-					Version: "0.8.1",
-					Exe:     "xxhsum",
-				},
-			},
-		})
+set-alias xxhsum singularity run xxhsum
+`, def.Description, def.EnvironmentName, def.EnvironmentVersion, moduleLoadPath))
 	})
 }

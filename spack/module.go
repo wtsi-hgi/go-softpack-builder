@@ -29,61 +29,24 @@ import (
 	"text/template"
 )
 
-//go:embed singularity.tmpl
-var singularityTmplStr string
-var singularityTmpl *template.Template
+//go:embed module.tmpl
+var moduleTmplStr string
+var moduleTmpl *template.Template
 
 func init() {
-	singularityTmpl = template.Must(template.New("").Parse(singularityTmplStr))
+	moduleTmpl = template.Must(template.New("").Parse(moduleTmplStr))
 }
 
-type Package struct {
-	Name    string
-	Version string
+func (d *Definition) ToModule(deps []string) string {
+	var sb strings.Builder
 
-	// Exe is the command line a user would run to use this software
-	Exe string
-}
-
-type Definition struct {
-	EnvironmentPath    string
-	EnvironmentName    string
-	EnvironmentVersion string
-	Description        string
-	Packages           []Package
-}
-
-type Builder struct {
-	buildCache         string
-	customSpackRepoURL string
-	customSpackRepoRef string
-}
-
-// New takes the s3 build cache URL, the repo and checkout reference of your
-// custom spack repo, and returns a Builder.
-func New(buildCache, repoURL, repoRef string) *Builder {
-	return &Builder{
-		buildCache:         buildCache,
-		customSpackRepoURL: repoURL,
-		customSpackRepoRef: repoRef,
-	}
-}
-
-type templateVars struct {
-	BuildCache string
-	RepoURL    string
-	RepoRef    string
-	Packages   []Package
-}
-
-func (b *Builder) GenerateSingularityDef(def *Definition) (string, error) {
-	var w strings.Builder
-	err := singularityTmpl.Execute(&w, &templateVars{
-		BuildCache: b.buildCache,
-		RepoURL:    b.customSpackRepoURL,
-		RepoRef:    b.customSpackRepoRef,
-		Packages:   def.Packages,
+	moduleTmpl.Execute(&sb, struct {
+		Dependencies []string
+		*Definition
+	}{
+		Dependencies: deps,
+		Definition:   d,
 	})
 
-	return w.String(), err
+	return sb.String()
 }

@@ -35,22 +35,7 @@ func TestBuilder(t *testing.T) {
 		So(builder, ShouldNotBeNil)
 
 		Convey("You can generate a singularity .def", func() {
-			def, err := builder.GenerateSingularityDef(&Definition{
-				EnvironmentPath: "groups/hgi/",
-				EnvironmentName: "package-name",
-				Description:     "a description of my environment",
-				Packages: []Package{
-					{
-						Name:    "xxhash",
-						Version: "0.8.1",
-						Exe:     "xxhsum",
-					},
-					{
-						Name:    "r-seurat",
-						Version: "4",
-					},
-				},
-			})
+			def, err := builder.GenerateSingularityDef(getExampleDefinition())
 
 			So(err, ShouldBeNil)
 			So(def, ShouldEqual, `Bootstrap: docker
@@ -117,4 +102,24 @@ Stage: final
 `)
 		})
 	})
+}
+
+func getExampleDefinition() *Definition {
+	return &Definition{
+		EnvironmentPath:    "groups/hgi/",
+		EnvironmentName:    "xxhash",
+		EnvironmentVersion: "0.8.1",
+		Description:        "some help text",
+		Packages: []Package{
+			{
+				Name:    "xxhash",
+				Version: "0.8.1",
+				Exe:     "xxhsum",
+			},
+			{
+				Name:    "r-seurat",
+				Version: "4",
+			},
+		},
+	}
 }
