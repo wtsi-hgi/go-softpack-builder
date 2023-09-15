@@ -60,7 +60,7 @@ func (d *Definition) ToModule(deps []string) string {
 func (d *Definition) ModuleUsage(loadPath string) string {
 	var sb strings.Builder
 
-	usageTmpl.Execute(&sb, filepath.Join(loadPath, d.EnvironmentName, d.EnvironmentVersion))
+	usageTmpl.Execute(&sb, filepath.Join(loadPath, d.EnvironmentPath, d.EnvironmentName, d.EnvironmentVersion))
 
 	return sb.String()
 }

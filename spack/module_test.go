@@ -64,7 +64,7 @@ set-alias xxhsum singularity run xxhsum
 To use this environment, run:
 
 `+"```"+`
-module load HGI/softpack/xxhash/0.8.1
+module load HGI/softpack/groups/hgi/xxhash/0.8.1
 `+"```"+`
 
 This will usually add your desired software to your PATH. Check the description
@@ -72,7 +72,7 @@ of the environment for more information, which might also be available by
 running:
 
 `+"```"+`
-module help HGI/softpack/xxhash/0.8.1
+module help HGI/softpack/groups/hgi/xxhash/0.8.1
 `+"```\n")
 	})
 }
