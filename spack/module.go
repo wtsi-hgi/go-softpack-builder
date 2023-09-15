@@ -25,6 +25,7 @@ package spack
 
 import (
 	_ "embed"
+	"path/filepath"
 	"strings"
 	"text/template"
 )
@@ -33,8 +34,13 @@ import (
 var moduleTmplStr string
 var moduleTmpl *template.Template
 
+//go:embed usage.tmpl
+var usageTmplStr string
+var usageTmpl *template.Template
+
 func init() {
 	moduleTmpl = template.Must(template.New("").Parse(moduleTmplStr))
+	usageTmpl = template.Must(template.New("").Parse(usageTmplStr))
 }
 
 func (d *Definition) ToModule(deps []string) string {
@@ -47,6 +53,14 @@ func (d *Definition) ToModule(deps []string) string {
 		Dependencies: deps,
 		Definition:   d,
 	})
+
+	return sb.String()
+}
+
+func (d *Definition) ModuleUsage(loadPath string) string {
+	var sb strings.Builder
+
+	usageTmpl.Execute(&sb, filepath.Join(loadPath, d.EnvironmentName, d.EnvironmentVersion))
 
 	return sb.String()
 }

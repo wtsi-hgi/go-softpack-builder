@@ -32,11 +32,11 @@ import (
 
 func TestModule(t *testing.T) {
 	Convey("Given a Definition, you can generate a module file", t, func() {
-		// moduleLoadPath would come from our config yml
-		moduleLoadPath := "/software/modules/ISG/singularity/3.10.0"
+		// moduleDependencies would come from our config yml
+		moduleDependencies := "/software/modules/ISG/singularity/3.10.0"
 
 		def := getExampleDefinition()
-		moduleFileData := def.ToModule([]string{moduleLoadPath})
+		moduleFileData := def.ToModule([]string{moduleDependencies})
 		So(moduleFileData, ShouldEqual, fmt.Sprintf(`#%%Module
 
 proc ModulesHelp { } {
@@ -50,6 +50,29 @@ module-whatis "Packages: xxhash@0.8.1, r-seurat@4"
 module load %s
 
 set-alias xxhsum singularity run xxhsum
-`, def.Description, def.EnvironmentName, def.EnvironmentVersion, moduleLoadPath))
+`, def.Description, def.EnvironmentName, def.EnvironmentVersion, moduleDependencies))
+	})
+
+	Convey("Given a Definition, you can generate a Usage for a module file", t, func() {
+		// moduleLoadPath would come from our config yml
+		moduleLoadPath := "HGI/softpack"
+
+		def := getExampleDefinition()
+		usageFileData := def.ModuleUsage(moduleLoadPath)
+		So(usageFileData, ShouldEqual, `# Usage
+
+To use this environment, run:
+
+`+"```"+`
+module load HGI/softpack/xxhash/0.8.1
+`+"```"+`
+
+This will usually add your desired software to your PATH. Check the description
+of the environment for more information, which might also be available by
+running:
+
+`+"```"+`
+module help HGI/softpack/xxhash/0.8.1
+`+"```\n")
 	})
 }
