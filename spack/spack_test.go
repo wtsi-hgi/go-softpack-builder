@@ -30,29 +30,30 @@ import (
 )
 
 func TestSpack(t *testing.T) {
-	Convey("Given binary cache and spack repo details and a Definition, you can generate a singularity .def ", t, func() {
+	Convey("Given binary cache and spack repo details and a Definition", t, func() {
 		builder := New("s3://spack", "https://github.com/spack/repo", "some_tag")
 		So(builder, ShouldNotBeNil)
 
-		def, err := builder.GenerateSingularityDef(&Definition{
-			EnvironmentPath: "groups/hgi/",
-			EnvironmentName: "package-name",
-			Description:     "a description of my environment",
-			Packages: []Package{
-				{
-					Name:    "xxhash",
-					Version: "0.8.1",
-					Exe:     "xxhsum",
+		Convey("You can generate a singularity .def", func() {
+			def, err := builder.GenerateSingularityDef(&Definition{
+				EnvironmentPath: "groups/hgi/",
+				EnvironmentName: "package-name",
+				Description:     "a description of my environment",
+				Packages: []Package{
+					{
+						Name:    "xxhash",
+						Version: "0.8.1",
+						Exe:     "xxhsum",
+					},
+					{
+						Name:    "r-seurat",
+						Version: "4",
+					},
 				},
-				{
-					Name:    "r-seurat",
-					Version: "4",
-				},
-			},
-		})
+			})
 
-		So(err, ShouldBeNil)
-		So(def, ShouldEqual, `Bootstrap: docker
+			So(err, ShouldBeNil)
+			So(def, ShouldEqual, `Bootstrap: docker
 From: spack/ubuntu-jammy:latest
 Stage: build
 
@@ -114,6 +115,21 @@ Stage: final
 	# Modify the environment without relying on sourcing shell specific files at startup
 	cat /opt/spack-environment/environment_modifications.sh >> $SINGULARITY_ENVIRONMENT
 `)
+		})
 
+		Convey("You can generate a wr input", func() {
+			// buildBase would come from our yml config, and envPath and Name
+			// would come from the Definition from the core post to our Server.
+			buildBase := "spack/builds/"
+			envPath := "users/user"
+			envName := "myenv"
+			s3Path := buildBase + envPath + "/" + envName
+
+			wrInput, err := builder.GenerateWRAddInput(s3Path)
+			So(err, ShouldBeNil)
+			So(wrInput, ShouldEqual, `{"cmd": "echo doing build in spack/builds/users/user/myenv; sudo singularity build --force singularity.sif singularity.def", `+
+				`"retries": 0, "rep_grp": "singularity_build-spack/builds/users/user/myenv", "limit_grps": ["s3cache"], `+
+				`"mounts_json": [{"Targets": [{"Path":"spack/builds/users/user/myenv","Write":true,"Cache":true}]}]`)
+		})
 	})
 }
