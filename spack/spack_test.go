@@ -30,7 +30,7 @@ import (
 )
 
 func TestSpack(t *testing.T) {
-	Convey("Given S3 configuration, ", t, func() {
+	Convey("Given binary cache and spack repo details and a Definition, you can generate a singularity .def ", t, func() {
 		builder := New("s3://spack", "https://github.com/spack/repo", "some_tag")
 		So(builder, ShouldNotBeNil)
 
