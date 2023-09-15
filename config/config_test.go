@@ -45,7 +45,7 @@ func TestConfig(t *testing.T) {
 		So(config.Module.LoadPath, ShouldEqual, "HGI/softpack")
 		So(config.Module.Dependencies, ShouldResemble, []string{"/software/modules/ISG/singularity/3.10.0"})
 		So(config.CustomSpackRepo.URL, ShouldEqual, "https://github.com/org/spack")
-		So(config.CustomSpackRepo.Commit, ShouldEqual, "aaaaaaa")
+		So(config.CustomSpackRepo.Ref, ShouldEqual, "aaaaaaa")
 		So(config.CoreURL, ShouldEqual, "http://x.y.z:9837/graphql")
 		So(config.ListenURL, ShouldEqual, "localhost:2456")
 	})

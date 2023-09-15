@@ -42,8 +42,8 @@ type Config struct {
 		Dependencies []string `yaml:"dependencies"`
 	} `yaml:"module"`
 	CustomSpackRepo struct {
-		URL    string `yaml:"url"`
-		Commit string `yaml:"commit"`
+		URL string `yaml:"url"`
+		Ref string `yaml:"ref"`
 	} `yaml:"customSpackRepo"`
 	CoreURL   string `yaml:"coreURL"`
 	ListenURL string `yaml:"listenURL"`

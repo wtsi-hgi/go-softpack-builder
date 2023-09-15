@@ -27,15 +27,22 @@ import (
 	"testing"
 
 	. "github.com/smartystreets/goconvey/convey"
+	"github.com/wtsi-hgi/go-softpack-builder/config"
 )
 
 func TestBuilder(t *testing.T) {
 	Convey("Given binary cache and spack repo details and a Definition", t, func() {
-		builder := New("s3://spack", "https://github.com/spack/repo", "some_tag")
+		var conf config.Config
+		conf.S3.BinaryCache = "s3://spack"
+		conf.S3.BuildBase = "some_path"
+		conf.CustomSpackRepo.URL = "https://github.com/spack/repo"
+		conf.CustomSpackRepo.Ref = "some_tag"
+		builder := New(&conf)
 		So(builder, ShouldNotBeNil)
+		def := getExampleDefinition()
 
 		Convey("You can generate a singularity .def", func() {
-			def, err := builder.GenerateSingularityDef(getExampleDefinition())
+			def, err := builder.GenerateSingularityDef(def)
 
 			So(err, ShouldBeNil)
 			So(def, ShouldEqual, `Bootstrap: docker
@@ -100,6 +107,12 @@ Stage: final
 	# Modify the environment without relying on sourcing shell specific files at startup
 	cat /opt/spack-environment/environment_modifications.sh >> $SINGULARITY_ENVIRONMENT
 `)
+		})
+
+		Convey("You can do a Build", func() {
+			err := builder.Build(def)
+			So(err, ShouldBeNil)
+
 		})
 	})
 }

@@ -27,6 +27,8 @@ import (
 	_ "embed"
 	"strings"
 	"text/template"
+
+	"github.com/wtsi-hgi/go-softpack-builder/config"
 )
 
 //go:embed singularity.tmpl
@@ -54,18 +56,14 @@ type Definition struct {
 }
 
 type Builder struct {
-	buildCache         string
-	customSpackRepoURL string
-	customSpackRepoRef string
+	config *config.Config
 }
 
 // New takes the s3 build cache URL, the repo and checkout reference of your
 // custom spack repo, and returns a Builder.
-func New(buildCache, repoURL, repoRef string) *Builder {
+func New(config *config.Config) *Builder {
 	return &Builder{
-		buildCache:         buildCache,
-		customSpackRepoURL: repoURL,
-		customSpackRepoRef: repoRef,
+		config: config,
 	}
 }
 
@@ -79,11 +77,20 @@ type templateVars struct {
 func (b *Builder) GenerateSingularityDef(def *Definition) (string, error) {
 	var w strings.Builder
 	err := singularityTmpl.Execute(&w, &templateVars{
-		BuildCache: b.buildCache,
-		RepoURL:    b.customSpackRepoURL,
-		RepoRef:    b.customSpackRepoRef,
+		BuildCache: b.config.S3.BinaryCache,
+		RepoURL:    b.config.CustomSpackRepo.URL,
+		RepoRef:    b.config.CustomSpackRepo.Ref,
 		Packages:   def.Packages,
 	})
 
 	return w.String(), err
+}
+
+func (b *Builder) Build(def *Definition) error {
+	// singDef, err := b.GenerateSingularityDef(def)
+	// if err != nil {
+	// 	return err
+	// }
+
+	return nil
 }
