@@ -33,13 +33,8 @@ import (
 var singularityTmplStr string
 var singularityTmpl *template.Template
 
-//go:embed wr.tmpl
-var wrTmplStr string
-var wrTmpl *template.Template
-
 func init() {
 	singularityTmpl = template.Must(template.New("").Parse(singularityTmplStr))
-	wrTmpl = template.Must(template.New("").Parse(wrTmplStr))
 }
 
 type Package struct {
@@ -90,14 +85,4 @@ func (b *Builder) GenerateSingularityDef(def *Definition) (string, error) {
 	})
 
 	return w.String(), err
-}
-
-func (b *Builder) GenerateWRAddInput(s3Path string) (string, error) {
-	var w strings.Builder
-
-	if err := wrTmpl.Execute(&w, s3Path); err != nil {
-		return "", err
-	}
-
-	return w.String(), nil
 }
