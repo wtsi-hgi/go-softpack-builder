@@ -90,7 +90,8 @@ Stage: final
 		s3Path := buildBase + envPath + "/" + envName
 
 		// put the .def file in S3 so it can be seen in OpenStack: 30mins
-		err := WriteSingularityDefToS3(spackSingularityDef, s3Path)
+        s3, err := s3.New(s3Path)
+		err := s3.Upload(spackSingularityDef, "singularity.def")
 		So(err, ShouldBeNil)
 
 		// generate a wr input line based on a template: 30mins
@@ -129,20 +130,24 @@ module load HGI/softpack/xxhash/0.8.1
 `)
 
 		// get artifacts (the image and lock file) from s3: 1hr
-		imageData, lockData, err := GetArtifactsFromS3(s3Path)
+        imagePath := os.CreateTemp("", "")
+		err := s3.Download("singularity.sif", imagePath)
+		So(err, ShouldBeNil)
+        lockPath := os.CreateTemp("", "")
+        err := s3.Download("spack.lock", lockPath)
 		So(err, ShouldBeNil)
 
 		// install module file and image to /software: 30min
-		err = InstallModule(moduleInstallDir, def, moduleFileData, imageData)
+		err = InstallModule(moduleInstallDir, def, moduleFileData, imagePath)
 		So(err, ShouldBeNil)
 
 		// interpret the lock file to generate a softpack.yml with versions,
 		// based on a template: 2hr
-		versionedSoftpackYMLData, err := SpackLockToSoftPackYML(lockData)
+		versionedSoftpackYMLData, err := SpackLockToSoftPackYML(lockPath)
 		So(err, ShouldBeNil)
 
 		// push artifacts to git repo via core: 2hr
-		err = AddArtifactsToRepo(coreURL, def, imageData, lockData,
+		err = AddArtifactsToRepo(coreURL, def, imagePath, lockPath,
 			spackSingularityDef, moduleFileData, readmeFileData,
 			versionedSoftpackYMLData)
 		So(err, ShouldBeNil)
