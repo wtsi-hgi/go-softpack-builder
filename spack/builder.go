@@ -25,11 +25,19 @@ package spack
 
 import (
 	_ "embed"
+	"fmt"
+	"io"
+	"os"
+	"path/filepath"
 	"strings"
 	"text/template"
 
 	"github.com/wtsi-hgi/go-softpack-builder/config"
+	"github.com/wtsi-hgi/go-softpack-builder/s3"
+	"github.com/wtsi-hgi/go-softpack-builder/wr"
 )
+
+const singularityDefBasename = "singularity.def"
 
 //go:embed singularity.tmpl
 var singularityTmplStr string
@@ -57,14 +65,28 @@ type Definition struct {
 
 type Builder struct {
 	config *config.Config
+	s3     interface {
+		UploadData(data io.Reader, dest string) error
+		DownloadFile(source, dest string) error
+	}
+	runner interface {
+		Run(deployment string) error
+	}
 }
 
 // New takes the s3 build cache URL, the repo and checkout reference of your
 // custom spack repo, and returns a Builder.
-func New(config *config.Config) *Builder {
+func New(config *config.Config) (*Builder, error) {
+	s3helper, err := s3.New(config.S3.BuildBase)
+	if err != nil {
+		return nil, err
+	}
+
 	return &Builder{
 		config: config,
-	}
+		s3:     s3helper,
+		runner: wr.New(config.WRDeployment),
+	}, nil
 }
 
 type templateVars struct {
@@ -87,10 +109,70 @@ func (b *Builder) GenerateSingularityDef(def *Definition) (string, error) {
 }
 
 func (b *Builder) Build(def *Definition) error {
-	// singDef, err := b.GenerateSingularityDef(def)
-	// if err != nil {
-	// 	return err
-	// }
+	singDef, err := b.GenerateSingularityDef(def)
+	if err != nil {
+		return err
+	}
+
+	s3Path := filepath.Join(
+		b.config.S3.BuildBase, def.EnvironmentPath, def.EnvironmentName,
+		def.EnvironmentVersion,
+	)
+
+	err = b.s3.UploadData(strings.NewReader(singDef), filepath.Join(
+		s3Path, singularityDefBasename,
+	))
+	if err != nil {
+		return err
+	}
+
+	wrInput, err := wr.SingularityBuildInS3WRInput(s3Path)
+	if err != nil {
+		return err
+	}
+
+	go func() {
+		errb := b.asyncBuild(def, wrInput)
+		fmt.Println(errb.Error())
+	}()
 
 	return nil
+}
+
+func (b *Builder) asyncBuild(def *Definition, wrInput string) error {
+	err := b.runner.Run(wrInput)
+	if err != nil {
+		return err
+	}
+
+	tmpDir, err := os.MkdirTemp("", "")
+	if err != nil {
+		return err
+	}
+	defer os.RemoveAll(tmpDir)
+
+	imagePath := filepath.Join(tmpDir, "sif")
+
+	err = b.s3.DownloadFile("singularity.sif", imagePath)
+	if err != nil {
+		return err
+	}
+
+	// and for spack.lock file
+
+	moduleFileData := def.ToModule(b.config.Module.Dependencies)
+	// usageFileData := def.ModuleUsage(b.config.Module.LoadPath)
+
+	imageFile, err := os.Open(imagePath)
+	if err != nil {
+		return err
+	}
+	defer imageFile.Close()
+
+	err = InstallModule(b.config.Module.InstallDir, def,
+		strings.NewReader(moduleFileData), imageFile)
+
+	// SpackLockToSoftPackYML and AddArtifactsToRepo
+
+	return err
 }

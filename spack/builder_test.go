@@ -24,11 +24,30 @@
 package spack
 
 import (
+	"io"
 	"testing"
 
 	. "github.com/smartystreets/goconvey/convey"
 	"github.com/wtsi-hgi/go-softpack-builder/config"
 )
+
+type mockS3 struct {
+}
+
+func (m *mockS3) UploadData(data io.Reader, dest string) error {
+	return nil
+}
+
+func (m *mockS3) DownloadFile(source, dest string) error {
+	return nil
+}
+
+type mockWR struct {
+}
+
+func (m *mockWR) Run(string) error {
+	return nil
+}
 
 func TestBuilder(t *testing.T) {
 	Convey("Given binary cache and spack repo details and a Definition", t, func() {
@@ -37,8 +56,13 @@ func TestBuilder(t *testing.T) {
 		conf.S3.BuildBase = "some_path"
 		conf.CustomSpackRepo.URL = "https://github.com/spack/repo"
 		conf.CustomSpackRepo.Ref = "some_tag"
-		builder := New(&conf)
-		So(builder, ShouldNotBeNil)
+
+		builder := &Builder{
+			config: &conf,
+			s3:     new(mockS3),
+			runner: new(mockWR),
+		}
+
 		def := getExampleDefinition()
 
 		Convey("You can generate a singularity .def", func() {

@@ -45,8 +45,9 @@ type Config struct {
 		URL string `yaml:"url"`
 		Ref string `yaml:"ref"`
 	} `yaml:"customSpackRepo"`
-	CoreURL   string `yaml:"coreURL"`
-	ListenURL string `yaml:"listenURL"`
+	CoreURL      string `yaml:"coreURL"`
+	ListenURL    string `yaml:"listenURL"`
+	WRDeployment string `yaml:"wrDeployment"`
 }
 
 func Parse(r io.Reader) (*Config, error) {
