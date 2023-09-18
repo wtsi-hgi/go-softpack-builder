@@ -26,9 +26,11 @@ package wr
 import (
 	"bytes"
 	"crypto/rand"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
+	"strings"
 	"testing"
 	"time"
 
@@ -36,19 +38,24 @@ import (
 )
 
 func TestWR(t *testing.T) {
-	Convey("You can generate a wr input", t, func() {
-		// buildBase would come from our yml config, and envPath and Name
-		// would come from the Definition from the core post to our Server.
-		buildBase := "spack/builds/"
-		envPath := "users/user"
-		envName := "myenv"
-		s3Path := buildBase + envPath + "/" + envName
+	// buildBase would come from our yml config, and envPath and Name
+	// would come from the Definition from the core post to our Server.
+	buildBase := "spack/builds/"
+	envPath := "users/user"
+	envName := "myenv"
+	s3Path := buildBase + envPath + "/" + envName
 
+	Convey("You can generate a wr input", t, func() {
 		wrInput, err := SingularityBuildInS3WRInput(s3Path)
 		So(err, ShouldBeNil)
-		So(wrInput, ShouldEqual, `{"cmd": "echo doing build in spack/builds/users/user/myenv; sudo singularity build --force singularity.sif singularity.def > build.out 2> build.err", `+
+		So(wrInput, ShouldEqual, `{"cmd": "echo doing build in spack/builds/users/user/myenv; `+
+			`sudo singularity build --force singularity.sif singularity.def > build.out 2> build.err", `+
 			`"retries": 0, "rep_grp": "singularity_build-spack/builds/users/user/myenv", "limit_grps": ["s3cache"], `+
-			`"mounts_json": [{"Targets": [{"Path":"spack/builds/users/user/myenv","Write":true,"Cache":true}]}]`)
+			`"mounts_json": [{"Targets": [{"Path":"spack/builds/users/user/myenv","Write":true,"Cache":true}]}]}`)
+
+		var m map[string]any
+		err = json.NewDecoder(strings.NewReader(wrInput)).Decode(&m)
+		So(err, ShouldBeNil)
 	})
 
 	gsbWR := os.Getenv("GSB_WR_TEST")
@@ -68,7 +75,7 @@ func TestWR(t *testing.T) {
 		So(err, ShouldBeNil)
 		So(time.Since(now), ShouldBeGreaterThan, 2*time.Second)
 
-		cmd := exec.Command("wr", "status", "--deployment", runner.deployment, "-i", repGrp, "-o", "json")
+		cmd := exec.Command("wr", "status", "--deployment", runner.deployment, "-i", repGrp, "-o", "json") //nolint:gosec
 		var stdout bytes.Buffer
 		var stderr bytes.Buffer
 		cmd.Stdout = &stdout
@@ -84,6 +91,10 @@ func TestWR(t *testing.T) {
 		So(err, ShouldNotBeNil)
 		So(err.Error(), ShouldEqual, "exit status 1")
 	})
+
+	Convey("SingularityBuildInS3WRInput is valid wr input", t, func() {
+
+	})
 }
 
 func uniqueRunArgs(cmd string) (string, string) {
@@ -91,6 +102,7 @@ func uniqueRunArgs(cmd string) (string, string) {
 	n, err := rand.Read(b)
 	So(n, ShouldEqual, 16)
 	So(err, ShouldBeNil)
+
 	repGrp := fmt.Sprintf("%x", b)
 
 	return `{"cmd":"` + cmd + ` && echo ` + repGrp + `", "rep_grp": "` + repGrp + `", "retries": 0}`, repGrp

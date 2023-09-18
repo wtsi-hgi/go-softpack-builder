@@ -59,7 +59,7 @@ func New(deployment string) *Runner {
 }
 
 func (r *Runner) Run(wrInput string) error {
-	cmd := exec.Command("wr", "add", "--deployment", r.deployment, "--sync", "--time", "8h", "--memory", "8G")
+	cmd := exec.Command("wr", "add", "--deployment", r.deployment, "--sync", "--time", "8h", "--memory", "8G") //nolint:gosec
 	cmd.Stdin = strings.NewReader(wrInput)
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
