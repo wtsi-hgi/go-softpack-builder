@@ -24,11 +24,45 @@
 package cmd
 
 import (
-	"log/slog"
+	"net/http"
+	"os"
+	"path/filepath"
 
 	"github.com/spf13/cobra"
+	"github.com/wtsi-hgi/go-softpack-builder/config"
+	"github.com/wtsi-hgi/go-softpack-builder/server"
+	"github.com/wtsi-hgi/go-softpack-builder/spack"
 )
 
-func serverCmd(cmd *cobra.Command, args []string) {
-	slog.Info("server cmd ran")
+func serverCmd(_ *cobra.Command, _ []string) {
+	if configPath == "" {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			die(err.Error())
+		}
+
+		configPath = filepath.Join(home, ".softpack", "builder", "gsb-config.yml")
+	}
+
+	f, err := os.Open(configPath)
+	if err != nil {
+		die(err.Error())
+	}
+
+	conf, err := config.Parse(f)
+	f.Close()
+
+	if err != nil {
+		die(err.Error())
+	}
+
+	b, err := spack.New(conf)
+	if err != nil {
+		die(err.Error())
+	}
+
+	err = http.ListenAndServe(conf.ListenURL, server.New(b)) //nolint:gosec
+	if err != nil {
+		die(err.Error())
+	}
 }
