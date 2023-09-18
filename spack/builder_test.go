@@ -25,27 +25,77 @@ package spack
 
 import (
 	"io"
+	"log/slog"
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
+	"time"
 
 	. "github.com/smartystreets/goconvey/convey"
 	"github.com/wtsi-hgi/go-softpack-builder/config"
 )
 
+type Error string
+
+func (e Error) Error() string { return string(e) }
+
+const mockError = Error("Mock error")
+
 type mockS3 struct {
+	ch   chan struct{}
+	data string
+	dest string
+	fail bool
 }
 
 func (m *mockS3) UploadData(data io.Reader, dest string) error {
+	defer close(m.ch)
+
+	if m.fail {
+		return mockError
+	}
+
+	buff, err := io.ReadAll(data)
+	if err != nil {
+		return err
+	}
+
+	m.data = string(buff)
+	m.dest = dest
+
 	return nil
 }
 
 func (m *mockS3) DownloadFile(source, dest string) error {
-	return nil
+	f, err := os.Create(dest)
+	if err != nil {
+		return err
+	}
+
+	_, err = f.WriteString("mock")
+	if err != nil {
+		return err
+	}
+
+	return f.Close()
 }
 
 type mockWR struct {
+	ch   chan struct{}
+	cmd  string
+	fail bool
 }
 
-func (m *mockWR) Run(string) error {
+func (m *mockWR) Run(cmd string) error {
+	defer close(m.ch)
+
+	if m.fail {
+		return mockError
+	}
+
+	m.cmd = cmd
+
 	return nil
 }
 
@@ -57,10 +107,13 @@ func TestBuilder(t *testing.T) {
 		conf.CustomSpackRepo.URL = "https://github.com/spack/repo"
 		conf.CustomSpackRepo.Ref = "some_tag"
 
+		ms3 := &mockS3{ch: make(chan struct{})}
+		mwr := &mockWR{ch: make(chan struct{})}
+
 		builder := &Builder{
 			config: &conf,
-			s3:     new(mockS3),
-			runner: new(mockWR),
+			s3:     ms3,
+			runner: mwr,
 		}
 
 		def := getExampleDefinition()
@@ -133,11 +186,73 @@ Stage: final
 `)
 		})
 
+		var logWriter strings.Builder
+		slog.SetDefault(slog.New(slog.NewTextHandler(&logWriter, nil)))
+
 		Convey("You can do a Build", func() {
+			conf.Module.InstallDir = t.TempDir()
 			err := builder.Build(def)
 			So(err, ShouldBeNil)
 
+			<-ms3.ch
+			So(ms3.dest, ShouldEqual, "some_path/groups/hgi/xxhash/0.8.1/singularity.def")
+			So(ms3.data, ShouldContainSubstring, "specs:\n\t- xxhash@0.8.1\n\t- r-seurat@4\n\tview")
+
+			<-mwr.ch
+			So(mwr.cmd, ShouldContainSubstring, "echo doing build in some_path/groups/hgi/xxhash/0.8.1; sudo singularity build")
+
+			modulePath := filepath.Join(conf.Module.InstallDir,
+				def.EnvironmentPath, def.EnvironmentName, def.EnvironmentVersion)
+
+			ok := waitFor(func() bool {
+				_, err = os.Stat(modulePath)
+				if err == nil {
+					_, err = os.Stat(modulePath + ".sif")
+					if err == nil {
+						return true
+					}
+				}
+
+				return false
+			})
+			So(ok, ShouldBeTrue)
+
+			_, err = os.Stat(modulePath)
+			So(err, ShouldBeNil)
+
+			_, err = os.Stat(modulePath + ".sif")
+			So(err, ShouldBeNil)
+			So(logWriter.String(), ShouldBeBlank)
+
+			// TODO: test same def can't be built more than once simultaneously
 		})
+
+		Convey("Build returns an error if the upload fails", func() {
+			ms3.fail = true
+			err := builder.Build(def)
+			So(err, ShouldNotBeNil)
+		})
+
+		Convey("Build logs an error if the run fails", func() {
+			mwr.fail = true
+			err := builder.Build(def)
+			So(err, ShouldBeNil)
+
+			<-mwr.ch
+
+			ok := waitFor(func() bool {
+				return logWriter.String() != ""
+			})
+			So(ok, ShouldBeTrue)
+
+			So(logWriter.String(), ShouldContainSubstring,
+				"msg=\"Async part of build failed\" err=\"Mock error\" s3Path=some_path/groups/hgi/xxhash/0.8.1")
+
+			// TODO: the error log output from the run needs to be uploaded to
+			// env repo.
+		})
+
+		// TODO: implement and test SpackLockToSoftPackYML and AddArtifactsToRepo
 	})
 }
 
@@ -158,5 +273,24 @@ func getExampleDefinition() *Definition {
 				Version: "4",
 			},
 		},
+	}
+}
+
+func waitFor(toRun func() bool) bool {
+	timeout := time.NewTimer(5 * time.Second)
+	ticker := time.NewTicker(10 * time.Millisecond)
+
+	defer ticker.Stop()
+	defer timeout.Stop()
+
+	for {
+		select {
+		case <-timeout.C:
+			return false
+		case <-ticker.C:
+			if toRun() {
+				return true
+			}
+		}
 	}
 }

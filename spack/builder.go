@@ -25,8 +25,8 @@ package spack
 
 import (
 	_ "embed"
-	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -133,7 +133,9 @@ func (b *Builder) Build(def *Definition) error {
 
 	go func() {
 		errb := b.asyncBuild(def, wrInput)
-		fmt.Println(errb.Error())
+		if errb != nil {
+			slog.Error("Async part of build failed", "err", errb.Error(), "s3Path", s3Path)
+		}
 	}()
 
 	return nil
@@ -149,6 +151,7 @@ func (b *Builder) asyncBuild(def *Definition, wrInput string) error {
 	if err != nil {
 		return err
 	}
+
 	defer os.RemoveAll(tmpDir)
 
 	imagePath := filepath.Join(tmpDir, "sif")
