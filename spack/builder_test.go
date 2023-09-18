@@ -195,7 +195,7 @@ Stage: final
 			So(err, ShouldBeNil)
 
 			<-ms3.ch
-			So(ms3.dest, ShouldEqual, "some_path/groups/hgi/xxhash/0.8.1/singularity.def")
+			So(ms3.dest, ShouldEqual, "groups/hgi/xxhash/0.8.1/singularity.def")
 			So(ms3.data, ShouldContainSubstring, "specs:\n\t- xxhash@0.8.1\n\t- r-seurat@4\n\tview")
 
 			<-mwr.ch

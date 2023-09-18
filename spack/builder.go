@@ -115,18 +115,19 @@ func (b *Builder) Build(def *Definition) error {
 	}
 
 	s3Path := filepath.Join(
-		b.config.S3.BuildBase, def.EnvironmentPath, def.EnvironmentName,
+		def.EnvironmentPath, def.EnvironmentName,
 		def.EnvironmentVersion,
 	)
 
-	err = b.s3.UploadData(strings.NewReader(singDef), filepath.Join(
-		s3Path, singularityDefBasename,
-	))
+	singDefUploadPath := filepath.Join(s3Path, singularityDefBasename)
+	err = b.s3.UploadData(strings.NewReader(singDef), singDefUploadPath)
 	if err != nil {
 		return err
 	}
 
-	wrInput, err := wr.SingularityBuildInS3WRInput(s3Path)
+	singDefParentPath := filepath.Join(b.config.S3.BuildBase, s3Path)
+
+	wrInput, err := wr.SingularityBuildInS3WRInput(singDefParentPath)
 	if err != nil {
 		return err
 	}
@@ -134,7 +135,7 @@ func (b *Builder) Build(def *Definition) error {
 	go func() {
 		errb := b.asyncBuild(def, wrInput)
 		if errb != nil {
-			slog.Error("Async part of build failed", "err", errb.Error(), "s3Path", s3Path)
+			slog.Error("Async part of build failed", "err", errb.Error(), "s3Path", singDefParentPath)
 		}
 	}()
 
