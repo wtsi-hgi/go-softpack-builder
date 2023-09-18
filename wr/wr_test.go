@@ -46,7 +46,7 @@ func TestWR(t *testing.T) {
 
 		wrInput, err := SingularityBuildInS3WRInput(s3Path)
 		So(err, ShouldBeNil)
-		So(wrInput, ShouldEqual, `{"cmd": "echo doing build in spack/builds/users/user/myenv; sudo singularity build --force singularity.sif singularity.def", `+
+		So(wrInput, ShouldEqual, `{"cmd": "echo doing build in spack/builds/users/user/myenv; sudo singularity build --force singularity.sif singularity.def > build.out 2> build.err", `+
 			`"retries": 0, "rep_grp": "singularity_build-spack/builds/users/user/myenv", "limit_grps": ["s3cache"], `+
 			`"mounts_json": [{"Targets": [{"Path":"spack/builds/users/user/myenv","Write":true,"Cache":true}]}]`)
 	})
