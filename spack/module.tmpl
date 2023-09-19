@@ -12,7 +12,5 @@ module-whatis "Packages: {{ range $index, $package := .Packages }}{{ if ne $inde
 
 {{ range .Dependencies -}}
 module load {{ . }}
-{{ end -}}
-{{ range .Packages }}{{ if ne .Exe "" }}
-set-alias {{ .Exe }} singularity run {{ .Exe }}
-{{ end }}{{ end }}
+{{ end }}
+prepend-path PATH "{{ .InstallBase }}/{{ .EnvironmentPath }}/{{ .EnvironmentName }}/{{ .EnvironmentVersion}}-scripts"

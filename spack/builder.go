@@ -50,9 +50,6 @@ func init() {
 type Package struct {
 	Name    string
 	Version string
-
-	// Exe is the command line a user would run to use this software
-	Exe string
 }
 
 type Definition struct {
@@ -164,7 +161,7 @@ func (b *Builder) asyncBuild(def *Definition, wrInput, s3Path string) error {
 
 	// and for spack.lock file
 
-	moduleFileData := def.ToModule(b.config.Module.Dependencies)
+	moduleFileData := def.ToModule(b.config.Module.InstallDir, b.config.Module.Dependencies)
 	// usageFileData := def.ModuleUsage(b.config.Module.LoadPath)
 
 	imageFile, err := os.Open(imagePath)

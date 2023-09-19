@@ -32,11 +32,12 @@ import (
 
 func TestModule(t *testing.T) {
 	Convey("Given a Definition, you can generate a module file", t, func() {
-		// moduleDependencies would come from our config yml
+		// moduleDependencies and installDir would come from our config yml
 		moduleDependencies := "/software/modules/ISG/singularity/3.10.0"
+		installDir := "/software/modules/HGI/softpack"
 
 		def := getExampleDefinition()
-		moduleFileData := def.ToModule([]string{moduleDependencies})
+		moduleFileData := def.ToModule(installDir, []string{moduleDependencies})
 		So(moduleFileData, ShouldEqual, fmt.Sprintf(`#%%Module
 
 proc ModulesHelp { } {
@@ -49,8 +50,10 @@ module-whatis "Packages: xxhash@0.8.1, r-seurat@4"
 
 module load %s
 
-set-alias xxhsum singularity run xxhsum
-`, def.Description, def.EnvironmentName, def.EnvironmentVersion, moduleDependencies))
+prepend-path PATH "%s/%s/%s/%s-scripts"
+`, def.Description, def.EnvironmentName, def.EnvironmentVersion,
+			moduleDependencies, installDir, def.EnvironmentPath,
+			def.EnvironmentName, def.EnvironmentVersion))
 	})
 
 	Convey("Given a Definition, you can generate a Usage for a module file", t, func() {

@@ -43,13 +43,15 @@ func init() {
 	usageTmpl = template.Must(template.New("").Parse(usageTmplStr))
 }
 
-func (d *Definition) ToModule(deps []string) string {
+func (d *Definition) ToModule(installBase string, deps []string) string {
 	var sb strings.Builder
 
 	moduleTmpl.Execute(&sb, struct {
+		InstallBase  string
 		Dependencies []string
 		*Definition
 	}{
+		InstallBase:  installBase,
 		Dependencies: deps,
 		Definition:   d,
 	})

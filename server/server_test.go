@@ -58,7 +58,7 @@ func TestServer(t *testing.T) {
 	"version": "0.8.1",
 	"model": {
 		"description": "help text",
-		"packages": [{"name": "xxhash", "version": "0.8.1", "exe": "xxhsum"}]
+		"packages": [{"name": "xxhash", "version": "0.8.1"}]
 	}
 }
 `))
@@ -73,7 +73,6 @@ func TestServer(t *testing.T) {
 				{
 					Name:    "xxhash",
 					Version: "0.8.1",
-					Exe:     "xxhsum",
 				},
 			},
 		})

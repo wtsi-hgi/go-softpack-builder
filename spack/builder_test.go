@@ -271,7 +271,6 @@ func getExampleDefinition() *Definition {
 			{
 				Name:    "xxhash",
 				Version: "0.8.1",
-				Exe:     "xxhsum",
 			},
 			{
 				Name:    "r-seurat",
