@@ -11,14 +11,14 @@ Stage: build
 	mkdir /opt/spack-environment && cd /opt/spack-environment
 	cat << EOF > spack.yaml
 spack:
-	# add package specs to the specs list
-	specs:{{ range .Packages }}
-	- {{ .Name }}{{ if ne .Version "" }}@{{ .Version }}{{ end }}{{ end }}
-	view: /opt/view
-	concretizer:
-		unify: true
-	config:
-		install_tree: /opt/software
+  # add package specs to the specs list
+  specs:{{ range .Packages }}
+  - {{ .Name }}{{ if ne .Version "" }}@{{ .Version }}{{ end }}{{ end }}
+  view: /opt/view
+  concretizer:
+    unify: true
+  config:
+    install_tree: /opt/software
 EOF
 
 	# Install all the required software

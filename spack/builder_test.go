@@ -135,15 +135,15 @@ Stage: build
 	mkdir /opt/spack-environment && cd /opt/spack-environment
 	cat << EOF > spack.yaml
 spack:
-	# add package specs to the specs list
-	specs:
-	- xxhash@0.8.1
-	- r-seurat@4
-	view: /opt/view
-	concretizer:
-		unify: true
-	config:
-		install_tree: /opt/software
+  # add package specs to the specs list
+  specs:
+  - xxhash@0.8.1
+  - r-seurat@4
+  view: /opt/view
+  concretizer:
+    unify: true
+  config:
+    install_tree: /opt/software
 EOF
 
 	# Install all the required software
@@ -196,7 +196,7 @@ Stage: final
 
 			<-ms3.ch
 			So(ms3.dest, ShouldEqual, "groups/hgi/xxhash/0.8.1/singularity.def")
-			So(ms3.data, ShouldContainSubstring, "specs:\n\t- xxhash@0.8.1\n\t- r-seurat@4\n\tview")
+			So(ms3.data, ShouldContainSubstring, "specs:\n  - xxhash@0.8.1\n  - r-seurat@4\n  view")
 
 			<-mwr.ch
 			So(mwr.cmd, ShouldContainSubstring, "echo doing build in some_path/groups/hgi/xxhash/0.8.1; sudo singularity build")
