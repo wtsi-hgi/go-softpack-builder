@@ -1,1 +1,1 @@
-{"cmd": "echo doing build in {{ . }}; sudo singularity build --force singularity.sif singularity.def > build.out 2> build.err", "retries": 0, "rep_grp": "singularity_build-{{ . }}", "limit_grps": ["s3cache"], "mounts_json": [{"Targets": [{"Path":"{{ . }}","Write":true,"Cache":true}]}]}
+{"cmd": "echo doing build in {{ . }}; sudo singularity build --force singularity.sif singularity.def > build.out 2> build.err", "retries": 0, "rep_grp": "singularity_build-{{ . }}", "limit_grps": ["s3cache"], "mounts": [{"Targets": [{"Path":"{{ . }}","Write":true,"Cache":true}]}]}
