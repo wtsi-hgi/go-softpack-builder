@@ -43,10 +43,11 @@ func (e Error) Error() string { return string(e) }
 const mockError = Error("Mock error")
 
 type mockS3 struct {
-	ch   chan struct{}
-	data string
-	dest string
-	fail bool
+	ch             chan struct{}
+	data           string
+	dest           string
+	downloadSource string
+	fail           bool
 }
 
 func (m *mockS3) UploadData(data io.Reader, dest string) error {
@@ -68,6 +69,8 @@ func (m *mockS3) UploadData(data io.Reader, dest string) error {
 }
 
 func (m *mockS3) DownloadFile(source, dest string) error {
+	m.downloadSource = source
+
 	f, err := os.Create(dest)
 	if err != nil {
 		return err
@@ -216,6 +219,8 @@ Stage: final
 				return false
 			})
 			So(ok, ShouldBeTrue)
+
+			So(ms3.downloadSource, ShouldEqual, "groups/hgi/xxhash/0.8.1/singularity.sif")
 
 			_, err = os.Stat(modulePath)
 			So(err, ShouldBeNil)

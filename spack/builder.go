@@ -133,7 +133,7 @@ func (b *Builder) Build(def *Definition) error {
 	}
 
 	go func() {
-		errb := b.asyncBuild(def, wrInput)
+		errb := b.asyncBuild(def, wrInput, s3Path)
 		if errb != nil {
 			slog.Error("Async part of build failed", "err", errb.Error(), "s3Path", singDefParentPath)
 		}
@@ -142,7 +142,7 @@ func (b *Builder) Build(def *Definition) error {
 	return nil
 }
 
-func (b *Builder) asyncBuild(def *Definition, wrInput string) error {
+func (b *Builder) asyncBuild(def *Definition, wrInput, s3Path string) error {
 	err := b.runner.Run(wrInput)
 	if err != nil {
 		return err
@@ -157,7 +157,7 @@ func (b *Builder) asyncBuild(def *Definition, wrInput string) error {
 
 	imagePath := filepath.Join(tmpDir, "sif")
 
-	err = b.s3.DownloadFile("singularity.sif", imagePath)
+	err = b.s3.DownloadFile(filepath.Join(s3Path, "singularity.sif"), imagePath)
 	if err != nil {
 		return err
 	}
