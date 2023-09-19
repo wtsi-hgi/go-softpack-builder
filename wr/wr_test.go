@@ -86,6 +86,9 @@ func TestWR(t *testing.T) {
 		So(stderr.String(), ShouldBeBlank)
 		So(stdout.String(), ShouldContainSubstring, `"State":"complete"`)
 
+		err = runner.Run(runArgs)
+		So(err, ShouldBeNil)
+
 		runArgs, _ = uniqueRunArgs("false")
 		err = runner.Run(runArgs)
 		So(err, ShouldNotBeNil)
