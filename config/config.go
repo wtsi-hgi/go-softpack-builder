@@ -37,9 +37,10 @@ type Config struct {
 		BuildBase   string `yaml:"buildBase"`
 	} `yaml:"s3"`
 	Module struct {
-		InstallDir   string   `yaml:"installDir"`
-		LoadPath     string   `yaml:"loadPath"`
-		Dependencies []string `yaml:"dependencies"`
+		InstallDir    string   `yaml:"installDir"`
+		LoadPath      string   `yaml:"loadPath"`
+		Dependencies  []string `yaml:"dependencies"`
+		WrapperScript string   `yaml:"wrapperScript"`
 	} `yaml:"module"`
 	CustomSpackRepo struct {
 		URL string `yaml:"url"`

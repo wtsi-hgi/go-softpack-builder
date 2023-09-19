@@ -43,6 +43,7 @@ func TestConfig(t *testing.T) {
 		So(config.S3.BuildBase, ShouldEqual, "spack/builds")
 		So(config.Module.InstallDir, ShouldEqual, "/software/modules/HGI/softpack")
 		So(config.Module.LoadPath, ShouldEqual, "HGI/softpack")
+		So(config.Module.WrapperScript, ShouldEqual, "/path/to/wrapper/script")
 		So(config.Module.Dependencies, ShouldResemble, []string{"/software/modules/ISG/singularity/3.10.0"})
 		So(config.CustomSpackRepo.URL, ShouldEqual, "https://github.com/org/spack")
 		So(config.CustomSpackRepo.Ref, ShouldEqual, "aaaaaaa")

@@ -5,6 +5,7 @@ s3:
 module:
   installDir:  "/software/modules/HGI/softpack"
   loadPath: "HGI/softpack"
+  wrapperScript: "/path/to/wrapper/script"
   dependencies:
     - "/software/modules/ISG/singularity/3.10.0"
 

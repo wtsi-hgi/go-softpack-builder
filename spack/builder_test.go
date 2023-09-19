@@ -204,13 +204,17 @@ Stage: final
 			<-mwr.ch
 			So(mwr.cmd, ShouldContainSubstring, "echo doing build in some_path/groups/hgi/xxhash/0.8.1; sudo singularity build")
 
-			modulePath := filepath.Join(conf.Module.InstallDir,
-				def.EnvironmentPath, def.EnvironmentName, def.EnvironmentVersion)
+			envPath := filepath.Join(conf.Module.InstallDir,
+				def.EnvironmentPath, def.EnvironmentName)
+
+			modulePath := filepath.Join(envPath, def.EnvironmentVersion)
+			imagePath := filepath.Join(envPath, def.EnvironmentVersion+scriptsDirSuffix, imageBasename)
 
 			ok := waitFor(func() bool {
+				// TODO: tests symlinks exist and were detected...
 				_, err = os.Stat(modulePath)
 				if err == nil {
-					_, err = os.Stat(modulePath + ".sif")
+					_, err = os.Stat(imagePath)
 					if err == nil {
 						return true
 					}
@@ -225,7 +229,7 @@ Stage: final
 			_, err = os.Stat(modulePath)
 			So(err, ShouldBeNil)
 
-			_, err = os.Stat(modulePath + ".sif")
+			_, err = os.Stat(imagePath)
 			So(err, ShouldBeNil)
 			So(logWriter.String(), ShouldBeBlank)
 

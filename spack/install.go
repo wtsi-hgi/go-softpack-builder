@@ -30,16 +30,16 @@ import (
 )
 
 const (
-	imageExt = ".sif"
-	perms    = 0755
-	flags    = os.O_EXCL | os.O_CREATE | os.O_WRONLY
+	imageBasename    = "singularity.sif"
+	scriptsDirSuffix = "-scripts"
+	perms            = 0755
+	flags            = os.O_EXCL | os.O_CREATE | os.O_WRONLY
 )
 
-func InstallModule(installBase string, def *Definition, module, image io.Reader) error {
+func InstallModule(installBase string, def *Definition, module, image io.Reader, exes []string, wrapperScript string) error {
 	installDir := filepath.Join(installBase, def.EnvironmentPath, def.EnvironmentName)
 
-	err := os.MkdirAll(installDir, perms)
-	if err != nil {
+	if err := os.MkdirAll(installDir, perms); err != nil {
 		return err
 	}
 
@@ -49,16 +49,28 @@ func InstallModule(installBase string, def *Definition, module, image io.Reader)
 		return err
 	}
 
-	err = copyOrCleanup(f, module)
-	if err != nil {
+	if err = copyOrCleanup(f, module); err != nil {
 		return err
 	}
 
-	imagePath := filepath.Join(installDir, def.EnvironmentVersion+imageExt)
+	scriptsDir := filepath.Join(installDir, def.EnvironmentVersion+scriptsDirSuffix)
+
+	if err = os.MkdirAll(scriptsDir, perms); err != nil {
+		return err
+	}
+
+	imagePath := filepath.Join(scriptsDir, imageBasename)
+
 	f, err = os.OpenFile(imagePath, flags, perms)
 	if err != nil {
 		os.Remove(modulePath)
 		return err
+	}
+
+	for _, exe := range exes {
+		if err = os.Symlink(wrapperScript, filepath.Join(scriptsDir, exe)); err != nil {
+			return err
+		}
 	}
 
 	return copyOrCleanup(f, image)

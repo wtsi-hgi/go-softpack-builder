@@ -164,6 +164,11 @@ func (b *Builder) asyncBuild(def *Definition, wrInput, s3Path string) error {
 	moduleFileData := def.ToModule(b.config.Module.InstallDir, b.config.Module.Dependencies)
 	// usageFileData := def.ModuleUsage(b.config.Module.LoadPath)
 
+	// get exes
+	// singularity run imagePath bash -c 'while read link; do readlink "\$link"; done < <(find $(echo $PATH | tr ":" "\n" | grep /opt/view/ | tr "\n" " ") -maxdepth 1 -executable)'
+	// and filter by requested packages
+	exes := []string{}
+
 	imageFile, err := os.Open(imagePath)
 	if err != nil {
 		return err
@@ -171,7 +176,7 @@ func (b *Builder) asyncBuild(def *Definition, wrInput, s3Path string) error {
 	defer imageFile.Close()
 
 	err = InstallModule(b.config.Module.InstallDir, def,
-		strings.NewReader(moduleFileData), imageFile)
+		strings.NewReader(moduleFileData), imageFile, exes, b.config.Module.WrapperScript)
 
 	// SpackLockToSoftPackYML and AddArtifactsToRepo
 
