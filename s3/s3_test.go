@@ -77,6 +77,17 @@ func TestS3(t *testing.T) {
 				So(err, ShouldBeNil)
 				So(string(buf), ShouldEqual, testData)
 			})
+
+			Convey("And then open it", func() {
+				f, err := s3.OpenFile(basename)
+				So(err, ShouldBeNil)
+
+				defer f.Close()
+
+				buf, err := io.ReadAll(f)
+				So(err, ShouldBeNil)
+				So(string(buf), ShouldEqual, testData)
+			})
 		})
 	})
 }

@@ -57,3 +57,9 @@ func (s *S3) DownloadFile(source, dest string) error {
 
 	return s.S3Accessor.DownloadFile(source, dest)
 }
+
+func (s *S3) OpenFile(source string) (io.ReadCloser, error) {
+	source = s.RemotePath(source)
+
+	return s.S3Accessor.OpenFile(source, 0)
+}
