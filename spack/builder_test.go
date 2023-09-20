@@ -140,8 +140,8 @@ Stage: build
 spack:
   # add package specs to the specs list
   specs:
-  - xxhash@0.8.1
-  - r-seurat@4
+  - xxhash@0.8.1 arch=None-None-x86_64_v3
+  - r-seurat@4 arch=None-None-x86_64_v3
   view: /opt/view
   concretizer:
     unify: true
@@ -172,6 +172,12 @@ EOF
 	grep 'x-executable\|x-archive\|x-sharedlib' | \
 	awk -F: '{print $1}' | xargs strip
 
+	spack env activate .
+	exes="$(find $(echo $PATH | tr ":" "\n" | grep /opt/view/ | tr "\n" " ") -maxdepth 1 -executable -type l | xargs -L 1 readlink)";
+	for pkg in "xxhash" "r-seurat"; do
+		echo "$exes" | grep "/linux-[^/]*/gcc-[^/]*/$pkg-";
+	done | xargs -L 1 basename | sort | uniq > executables
+
 Bootstrap: docker
 From: ubuntu:22.04
 Stage: final
@@ -199,7 +205,7 @@ Stage: final
 
 			<-ms3.ch
 			So(ms3.dest, ShouldEqual, "groups/hgi/xxhash/0.8.1/singularity.def")
-			So(ms3.data, ShouldContainSubstring, "specs:\n  - xxhash@0.8.1\n  - r-seurat@4\n  view")
+			So(ms3.data, ShouldContainSubstring, "specs:\n  - xxhash@0.8.1 arch=None-None-x86_64_v3\n  - r-seurat@4 arch=None-None-x86_64_v3\n  view")
 
 			<-mwr.ch
 			So(mwr.cmd, ShouldContainSubstring, "echo doing build in some_path/groups/hgi/xxhash/0.8.1; sudo singularity build")

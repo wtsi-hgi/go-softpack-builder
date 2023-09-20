@@ -13,7 +13,7 @@ Stage: build
 spack:
   # add package specs to the specs list
   specs:{{ range .Packages }}
-  - {{ .Name }}{{ if ne .Version "" }}@{{ .Version }}{{ end }}{{ end }}
+  - {{ .Name }}{{ if ne .Version "" }}@{{ .Version }}{{ end }} arch=None-None-x86_64_v3{{ end }}
   view: /opt/view
   concretizer:
     unify: true
@@ -43,6 +43,12 @@ EOF
 	grep 'charset=binary' | \
 	grep 'x-executable\|x-archive\|x-sharedlib' | \
 	awk -F: '{print $1}' | xargs strip
+
+	spack env activate .
+	exes="$(find $(echo $PATH | tr ":" "\n" | grep /opt/view/ | tr "\n" " ") -maxdepth 1 -executable -type l | xargs -L 1 readlink)";
+	for pkg in{{ range .Packages }} "{{ .Name }}"{{ end }}; do
+		echo "$exes" | grep "/linux-[^/]*/gcc-[^/]*/$pkg-";
+	done | xargs -L 1 basename | sort | uniq > executables
 
 Bootstrap: docker
 From: ubuntu:22.04
