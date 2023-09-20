@@ -1,0 +1,6 @@
+#/bin/bash
+
+dir="$(dirname "$0")";
+cmd="$(basename "$0")";
+
+singularity run --bind /mount "$dir/singularity.sif" "$cmd" "$@";
