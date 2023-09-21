@@ -179,80 +179,70 @@ func (b *Builder) asyncBuild(def *Definition, wrInput, s3Path, singDef string) e
 
 	imagePath := filepath.Join(tmpDir, imageBasename)
 
-	err = b.s3.DownloadFile(filepath.Join(s3Path, imageBasename), imagePath)
-	if err != nil {
-		return err
-	}
-
 	moduleFileData := def.ToModule(b.config.Module.InstallDir, b.config.Module.Dependencies)
-	// TODO: usageFileData := def.ModuleUsage(b.config.Module.LoadPath)
 
-	imageFile, err := os.Open(imagePath)
-	if err != nil {
-		return err
-	}
-	defer imageFile.Close()
-
-	logData, err := b.s3.OpenFile(filepath.Join(s3Path, builderOut))
-	if err != nil {
+	if err = b.prepareArtifactsFromS3AndSendToCore(def, s3Path, imagePath, moduleFileData, singDef); err != nil {
 		return err
 	}
 
-	lockFile, err := b.s3.OpenFile(filepath.Join(s3Path, spackLock))
+	return b.prepareAndInstallArtifacts(def, s3Path, imagePath, moduleFileData)
+}
+
+func (b *Builder) prepareArtifactsFromS3AndSendToCore(def *Definition, s3Path,
+	imagePath, moduleFileData, singDef string) error {
+	logData, lockData, imageData, err := b.getArtifactDataFromS3(s3Path, imagePath)
 	if err != nil {
 		return err
 	}
 
-	lockData, err := io.ReadAll(lockFile)
-	if err != nil {
-		return err
-	}
+	defer imageData.Close()
 
 	concreteSpackYAMLFile, err := SpackLockToSoftPackYML(lockData, def.Description)
 	if err != nil {
 		return err
 	}
 
-	err = b.AddArtifactsToRepo(
-		imageFile,
-		bytes.NewReader(lockData),
-		concreteSpackYAMLFile,
-		strings.NewReader(singDef),
-		logData,
-		strings.NewReader(moduleFileData),
+	// TODO: usageFileData := def.ModuleUsage(b.config.Module.LoadPath)
+
+	return b.AddArtifactsToRepo(
+		map[string]io.Reader{
+			imageBasename:          imageData,
+			spackLock:              bytes.NewReader(lockData),
+			softpackYaml:           concreteSpackYAMLFile,
+			singularityDefBasename: strings.NewReader(singDef),
+			builderOut:             logData,
+			moduleForCoreBasename:  strings.NewReader(moduleFileData),
+		},
 		filepath.Join(def.EnvironmentPath, def.EnvironmentName+"-"+def.EnvironmentVersion),
 	)
-	if err != nil {
-		return err
-	}
-
-	exeData, err := b.s3.OpenFile(filepath.Join(s3Path, exesBasename))
-	if err != nil {
-		return err
-	}
-
-	exes, err := executablesFileToExes(exeData)
-	if err != nil {
-		return err
-	}
-
-	imageFile, err = os.Open(imagePath)
-	if err != nil {
-		return err
-	}
-	defer imageFile.Close()
-
-	return InstallModule(b.config.Module.InstallDir, def,
-		strings.NewReader(moduleFileData), imageFile, exes, b.config.Module.WrapperScript)
 }
 
-func executablesFileToExes(data io.Reader) ([]string, error) {
-	buf, err := io.ReadAll(data)
-	if err != nil {
-		return nil, err
+func (b *Builder) getArtifactDataFromS3(s3Path, imagePath string) (io.Reader, []byte, io.ReadCloser, error) {
+	if err := b.s3.DownloadFile(filepath.Join(s3Path, imageBasename), imagePath); err != nil {
+		return nil, nil, nil, err
 	}
 
-	return strings.Split(strings.TrimSpace(string(buf)), "\n"), nil
+	logData, err := b.s3.OpenFile(filepath.Join(s3Path, builderOut))
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	lockFile, err := b.s3.OpenFile(filepath.Join(s3Path, spackLock))
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	lockData, err := io.ReadAll(lockFile)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	imageFile, err := os.Open(imagePath)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	return logData, lockData, imageFile, nil
 }
 
 type ConcreteSpec struct {
@@ -299,7 +289,7 @@ func SpackLockToSoftPackYML(data []byte, desc string) (io.Reader, error) {
 	return strings.NewReader(sb.String()), nil
 }
 
-func (b *Builder) AddArtifactsToRepo(image, lock, softpackYML, singDef, log, module io.Reader, envPath string) error {
+func (b *Builder) AddArtifactsToRepo(artifacts map[string]io.Reader, envPath string) error { //nolint:misspell
 	pr, pw := io.Pipe()
 	writer := multipart.NewWriter(pw)
 	errCh := make(chan error, 1)
@@ -307,17 +297,8 @@ func (b *Builder) AddArtifactsToRepo(image, lock, softpackYML, singDef, log, mod
 	ctx, cancelFunc := context.WithCancel(context.Background())
 	defer cancelFunc()
 
-	m := map[string]io.Reader{
-		imageBasename:          image,
-		spackLock:              lock,
-		softpackYaml:           softpackYML,
-		singularityDefBasename: singDef,
-		builderOut:             log,
-		moduleForCoreBasename:  module,
-	}
-
 	go func() {
-		errCh <- sendFormFiles(m, writer, pw)
+		errCh <- sendFormFiles(artifacts, writer, pw) //nolint:misspell
 	}()
 
 	defer pw.Close()
@@ -337,8 +318,9 @@ func (b *Builder) AddArtifactsToRepo(image, lock, softpackYML, singDef, log, mod
 	return <-errCh
 }
 
-func sendFormFiles(m map[string]io.Reader, writer *multipart.Writer, writerInput io.Closer) error {
-	for name, r := range m {
+func sendFormFiles(artifacts map[string]io.Reader, //nolint:misspell
+	writer *multipart.Writer, writerInput io.Closer) error {
+	for name, r := range artifacts { //nolint:misspell
 		part, err := writer.CreateFormFile("file", name)
 		if err != nil {
 			return err
@@ -356,4 +338,34 @@ func sendFormFiles(m map[string]io.Reader, writer *multipart.Writer, writerInput
 	}
 
 	return writerInput.Close()
+}
+
+func (b *Builder) prepareAndInstallArtifacts(def *Definition, s3Path, imagePath, moduleFileData string) error {
+	exeData, err := b.s3.OpenFile(filepath.Join(s3Path, exesBasename))
+	if err != nil {
+		return err
+	}
+
+	exes, err := executablesFileToExes(exeData)
+	if err != nil {
+		return err
+	}
+
+	imageFile, err := os.Open(imagePath)
+	if err != nil {
+		return err
+	}
+	defer imageFile.Close()
+
+	return InstallModule(b.config.Module.InstallDir, def,
+		strings.NewReader(moduleFileData), imageFile, exes, b.config.Module.WrapperScript)
+}
+
+func executablesFileToExes(data io.Reader) ([]string, error) {
+	buf, err := io.ReadAll(data)
+	if err != nil {
+		return nil, err
+	}
+
+	return strings.Split(strings.TrimSpace(string(buf)), "\n"), nil
 }

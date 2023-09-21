@@ -36,61 +36,70 @@ const (
 	flags            = os.O_EXCL | os.O_CREATE | os.O_WRONLY
 )
 
-func InstallModule(installBase string, def *Definition, module, image io.Reader, exes []string, wrapperScript string) error {
-	installDir := filepath.Join(installBase, def.EnvironmentPath, def.EnvironmentName)
+func InstallModule(installBase string, def *Definition, module,
+	image io.Reader, exes []string, wrapperScript string) (err error) {
+	var installDir, scriptsDir string
 
-	if err := os.MkdirAll(installDir, perms); err != nil {
+	installDir, scriptsDir, err = makeModuleDirs(installBase, def)
+	if err != nil {
 		return err
 	}
 
 	modulePath := filepath.Join(installDir, def.EnvironmentVersion)
 
-	f, err := os.OpenFile(modulePath, flags, perms)
-	if err != nil {
+	defer func() {
+		if err != nil {
+			os.Remove(modulePath)
+			os.RemoveAll(scriptsDir)
+		}
+	}()
+
+	if err = installFile(module, modulePath); err != nil {
 		return err
 	}
 
-	if err = copyOrCleanup(f, module); err != nil {
+	if err = installFile(image, filepath.Join(scriptsDir, imageBasename)); err != nil {
 		return err
+	}
+
+	return createExeSymlinks(wrapperScript, scriptsDir, exes)
+}
+
+func makeModuleDirs(installBase string, def *Definition) (string, string, error) {
+	installDir := filepath.Join(installBase, def.EnvironmentPath, def.EnvironmentName)
+
+	if err := os.MkdirAll(installDir, perms); err != nil {
+		return "", "", err
 	}
 
 	scriptsDir := filepath.Join(installDir, def.EnvironmentVersion+scriptsDirSuffix)
 
-	if err = os.MkdirAll(scriptsDir, perms); err != nil {
-		return err
+	if err := os.MkdirAll(scriptsDir, perms); err != nil {
+		return "", "", err
 	}
 
-	imagePath := filepath.Join(scriptsDir, imageBasename)
+	return installDir, scriptsDir, nil
+}
 
-	f, err = os.OpenFile(imagePath, flags, perms)
+func installFile(data io.Reader, path string) error {
+	f, err := os.OpenFile(path, flags, perms)
 	if err != nil {
-		os.Remove(modulePath)
-
 		return err
 	}
 
+	defer f.Close()
+
+	_, err = io.Copy(f, data)
+
+	return err
+}
+
+func createExeSymlinks(wrapperScript, scriptsDir string, exes []string) error {
 	for _, exe := range exes {
-		if err = os.Symlink(wrapperScript, filepath.Join(scriptsDir, exe)); err != nil {
+		if err := os.Symlink(wrapperScript, filepath.Join(scriptsDir, exe)); err != nil {
 			return err
 		}
 	}
 
-	return copyOrCleanup(f, image)
-}
-
-func copyOrCleanup(f *os.File, src io.Reader) error {
-	_, err := io.Copy(f, src)
-	if err != nil {
-		f.Close()
-		os.Remove(f.Name())
-
-		return err
-	}
-
-	err = f.Close()
-	if err != nil {
-		os.Remove(f.Name())
-	}
-
-	return err
+	return nil
 }

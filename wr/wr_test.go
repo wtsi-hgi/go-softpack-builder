@@ -95,7 +95,7 @@ func TestWR(t *testing.T) {
 		runArgs, _ = uniqueRunArgs("false")
 		err = runner.Run(runArgs)
 		So(err, ShouldNotBeNil)
-		So(err.Error(), ShouldEqual, "exit status 1")
+		So(err.Error(), ShouldEqual, "wr add failed: exit status 1")
 	})
 
 	Convey("SingularityBuildInS3WRInput is valid wr input", t, func() {
