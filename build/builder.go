@@ -50,6 +50,7 @@ const (
 	spackLock              = "spack.lock"
 	builderOut             = "builder.out"
 	moduleForCoreBasename  = "module"
+	usageBasename          = "README.md"
 )
 
 //go:embed singularity.tmpl
@@ -207,8 +208,6 @@ func (b *Builder) prepareArtifactsFromS3AndSendToCore(def *Definition, s3Path,
 		return err
 	}
 
-	// TODO: usageFileData := def.ModuleUsage(b.config.Module.LoadPath)
-
 	return b.AddArtifactsToRepo(
 		map[string]io.Reader{
 			imageBasename:          imageData,
@@ -217,6 +216,7 @@ func (b *Builder) prepareArtifactsFromS3AndSendToCore(def *Definition, s3Path,
 			singularityDefBasename: strings.NewReader(singDef),
 			builderOut:             logData,
 			moduleForCoreBasename:  strings.NewReader(moduleFileData),
+			usageBasename:          strings.NewReader(def.ModuleUsage(b.config.Module.LoadPath)),
 		},
 		def.FullEnvironmentPath(),
 	)

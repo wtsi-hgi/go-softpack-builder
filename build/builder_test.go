@@ -256,6 +256,7 @@ Stage: final
 		Convey("You can do a Build", func() {
 			conf.Module.InstallDir = t.TempDir()
 			conf.Module.WrapperScript = "/path/to/wrapper"
+			conf.Module.LoadPath = "HGI/softpack"
 			ms3.exes = "xxhsum\nxxh32sum\nxxh64sum\nxxh128sum\n"
 			err := builder.Build(def)
 			So(err, ShouldBeNil)
@@ -315,6 +316,7 @@ packages:
 				spackLock:              `"concrete_specs":`,
 				imageBasename:          "mock",
 				builderOut:             "output",
+				usageBasename:          "module load HGI/softpack/groups/hgi/xxhash/0.8.1",
 			} {
 				data, ok := mc.files["groups/hgi/xxhash-0.8.1/"+file]
 				So(ok, ShouldBeTrue)
