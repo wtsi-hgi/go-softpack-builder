@@ -49,7 +49,7 @@ func TestWR(t *testing.T) {
 		wrInput, err := SingularityBuildInS3WRInput(s3Path)
 		So(err, ShouldBeNil)
 		So(wrInput, ShouldEqual, `{"cmd": "echo doing build in spack/builds/users/user/myenv; `+
-			`sudo singularity build $TMPDIR/singularity.sif singularity.def > build.out 2> build.err && `+
+			`sudo singularity build $TMPDIR/singularity.sif singularity.def &> builder.out && `+
 			`sudo singularity run $TMPDIR/singularity.sif cat /opt/spack-environment/executables > executables && `+
 			`sudo singularity run $TMPDIR/singularity.sif cat /opt/spack-environment/spack.lock > spack.lock && `+
 			`mv $TMPDIR/singularity.sif .", `+

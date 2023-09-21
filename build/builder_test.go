@@ -345,8 +345,9 @@ packages:
 			So(logWriter.String(), ShouldContainSubstring,
 				"msg=\"Async part of build failed\" err=\"Mock error\" s3Path=some_path/groups/hgi/xxhash/0.8.1")
 
-			// TODO: the error log output from the run needs to be uploaded to
-			// env repo.
+			data, ok := mc.files["groups/hgi/xxhash-0.8.1/"+builderOut]
+			So(ok, ShouldBeTrue)
+			So(data, ShouldContainSubstring, "output")
 		})
 	})
 }

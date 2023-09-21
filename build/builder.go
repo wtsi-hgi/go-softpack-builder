@@ -84,6 +84,10 @@ type Definition struct {
 	Packages           []Package
 }
 
+func (d *Definition) FullEnvironmentPath() string {
+	return filepath.Join(d.EnvironmentPath, d.EnvironmentName+"-"+d.EnvironmentVersion)
+}
+
 type Builder struct {
 	config *config.Config
 	s3     interface {
@@ -166,7 +170,8 @@ func (b *Builder) Build(def *Definition) error {
 func (b *Builder) asyncBuild(def *Definition, wrInput, s3Path, singDef string) error {
 	err := b.runner.Run(wrInput)
 	if err != nil {
-		// TODO: upload logData
+		b.AddLogToRepo(s3Path, def.FullEnvironmentPath())
+
 		return err
 	}
 
@@ -213,8 +218,21 @@ func (b *Builder) prepareArtifactsFromS3AndSendToCore(def *Definition, s3Path,
 			builderOut:             logData,
 			moduleForCoreBasename:  strings.NewReader(moduleFileData),
 		},
-		filepath.Join(def.EnvironmentPath, def.EnvironmentName+"-"+def.EnvironmentVersion),
+		def.FullEnvironmentPath(),
 	)
+}
+
+func (b *Builder) AddLogToRepo(s3Path, environmentPath string) {
+	log, err := b.s3.OpenFile(filepath.Join(s3Path, builderOut))
+	if err != nil {
+		slog.Error("error getting build log file", "err", err)
+	}
+
+	if err := b.AddArtifactsToRepo(map[string]io.Reader{
+		builderOut: log,
+	}, environmentPath); err != nil {
+		slog.Error("error sending build log file to core", "err", err)
+	}
 }
 
 func (b *Builder) getArtifactDataFromS3(s3Path, imagePath string) (io.Reader, []byte, io.ReadCloser, error) {
