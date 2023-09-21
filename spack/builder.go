@@ -24,9 +24,14 @@
 package spack
 
 import (
+	"bytes"
 	_ "embed"
+	"encoding/json"
 	"io"
 	"log/slog"
+	"mime/multipart"
+	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -40,15 +45,30 @@ import (
 const (
 	singularityDefBasename = "singularity.def"
 	exesBasename           = "executables"
+	softpackYaml           = "softpack.yml"
+	spackLock              = "spack.lock"
+	builderOut             = "builder.out"
+	moduleForCoreBasename  = "module"
 )
 
 //go:embed singularity.tmpl
 var singularityTmplStr string
-var singularityTmpl *template.Template
+var singularityTmpl *template.Template //nolint:gochecknoglobals
 
-func init() {
+//go:embed softpack.tmpl
+var softpackTmplStr string
+var softpackTmpl *template.Template //nolint:gochecknoglobals
+
+func init() { //nolint:gochecknoinits
 	singularityTmpl = template.Must(template.New("").Parse(singularityTmplStr))
+	softpackTmpl = template.Must(template.New("").Parse(softpackTmplStr))
 }
+
+type Error string
+
+func (e Error) Error() string { return string(e) }
+
+const ErrInvalidJSON = Error("invalid spack lock JSON")
 
 type Package struct {
 	Name    string
@@ -121,8 +141,8 @@ func (b *Builder) Build(def *Definition) error {
 	)
 
 	singDefUploadPath := filepath.Join(s3Path, singularityDefBasename)
-	err = b.s3.UploadData(strings.NewReader(singDef), singDefUploadPath)
-	if err != nil {
+
+	if err = b.s3.UploadData(strings.NewReader(singDef), singDefUploadPath); err != nil {
 		return err
 	}
 
@@ -134,8 +154,7 @@ func (b *Builder) Build(def *Definition) error {
 	}
 
 	go func() {
-		errb := b.asyncBuild(def, wrInput, s3Path)
-		if errb != nil {
+		if errb := b.asyncBuild(def, wrInput, s3Path, singDef); errb != nil {
 			slog.Error("Async part of build failed", "err", errb.Error(), "s3Path", singDefParentPath)
 		}
 	}()
@@ -143,9 +162,10 @@ func (b *Builder) Build(def *Definition) error {
 	return nil
 }
 
-func (b *Builder) asyncBuild(def *Definition, wrInput, s3Path string) error {
+func (b *Builder) asyncBuild(def *Definition, wrInput, s3Path, singDef string) error {
 	err := b.runner.Run(wrInput)
 	if err != nil {
+		// TODO: upload logData
 		return err
 	}
 
@@ -163,10 +183,47 @@ func (b *Builder) asyncBuild(def *Definition, wrInput, s3Path string) error {
 		return err
 	}
 
-	// and for spack.lock file, converting to a spack.yaml: SpackLockToSoftPackYML()
-
 	moduleFileData := def.ToModule(b.config.Module.InstallDir, b.config.Module.Dependencies)
-	// usageFileData := def.ModuleUsage(b.config.Module.LoadPath)
+	// TODO: usageFileData := def.ModuleUsage(b.config.Module.LoadPath)
+
+	imageFile, err := os.Open(imagePath)
+	if err != nil {
+		return err
+	}
+	defer imageFile.Close()
+
+	logData, err := b.s3.OpenFile(filepath.Join(s3Path, builderOut))
+	if err != nil {
+		return err
+	}
+
+	lockFile, err := b.s3.OpenFile(filepath.Join(s3Path, spackLock))
+	if err != nil {
+		return err
+	}
+
+	lockData, err := io.ReadAll(lockFile)
+	if err != nil {
+		return err
+	}
+
+	concreteSpackYAMLFile, err := SpackLockToSoftPackYML(lockData, def.Description)
+	if err != nil {
+		return err
+	}
+
+	err = b.AddArtifactsToRepo(
+		imageFile,
+		bytes.NewReader(lockData),
+		concreteSpackYAMLFile,
+		strings.NewReader(singDef),
+		logData,
+		strings.NewReader(moduleFileData),
+		filepath.Join(def.EnvironmentPath, def.EnvironmentName+"-"+def.EnvironmentVersion),
+	)
+	if err != nil {
+		return err
+	}
 
 	exeData, err := b.s3.OpenFile(filepath.Join(s3Path, exesBasename))
 	if err != nil {
@@ -178,18 +235,14 @@ func (b *Builder) asyncBuild(def *Definition, wrInput, s3Path string) error {
 		return err
 	}
 
-	imageFile, err := os.Open(imagePath)
+	imageFile, err = os.Open(imagePath)
 	if err != nil {
 		return err
 	}
 	defer imageFile.Close()
 
-	err = InstallModule(b.config.Module.InstallDir, def,
+	return InstallModule(b.config.Module.InstallDir, def,
 		strings.NewReader(moduleFileData), imageFile, exes, b.config.Module.WrapperScript)
-
-	// AddArtifactsToRepo(imageFile, lockFile, concreteSpackYAMLFile)
-
-	return err
 }
 
 func executablesFileToExes(data io.Reader) ([]string, error) {
@@ -199,4 +252,90 @@ func executablesFileToExes(data io.Reader) ([]string, error) {
 	}
 
 	return strings.Split(strings.TrimSpace(string(buf)), "\n"), nil
+}
+
+type ConcreteSpec struct {
+	Name, Version string
+}
+
+type SpackLock struct {
+	Roots []struct {
+		Hash, Spec string
+	}
+	ConcreteSpecs map[string]ConcreteSpec `json:"concrete_specs"`
+}
+
+func SpackLockToSoftPackYML(data []byte, desc string) (io.Reader, error) {
+	var sl SpackLock
+
+	if err := json.Unmarshal(data, &sl); err != nil {
+		return nil, err
+	}
+
+	var concreteSpecs []ConcreteSpec
+
+	for _, root := range sl.Roots {
+		concrete, ok := sl.ConcreteSpecs[root.Hash]
+		if !ok {
+			return nil, ErrInvalidJSON
+		}
+
+		concreteSpecs = append(concreteSpecs, concrete)
+	}
+
+	var sb strings.Builder
+
+	if err := softpackTmpl.Execute(&sb, struct {
+		Description []string
+		Packages    []ConcreteSpec
+	}{
+		Description: strings.Split(desc, "\n"),
+		Packages:    concreteSpecs,
+	}); err != nil {
+		return nil, err
+	}
+
+	return strings.NewReader(sb.String()), nil
+}
+
+func (b *Builder) AddArtifactsToRepo(image, lock, softpackYML, singDef, log, module io.Reader, envPath string) error {
+	pr, pw := io.Pipe()
+	writer := multipart.NewWriter(pw)
+	errCh := make(chan error, 1)
+
+	go func() {
+		_, err := http.Post(b.config.CoreURL+"?"+url.QueryEscape(envPath), writer.FormDataContentType(), pr)
+		errCh <- err
+	}()
+
+	for name, r := range map[string]io.Reader{
+		imageBasename:          image,
+		spackLock:              lock,
+		softpackYaml:           softpackYML,
+		singularityDefBasename: singDef,
+		builderOut:             log,
+		moduleForCoreBasename:  module,
+	} {
+		part, err := writer.CreateFormFile("file", name)
+		if err != nil {
+			return err
+		}
+
+		_, err = io.Copy(part, r)
+		if err != nil {
+			return err
+		}
+	}
+
+	err := writer.Close()
+	if err != nil {
+		return err
+	}
+
+	err = pw.Close()
+	if err != nil {
+		return err
+	}
+
+	return <-errCh
 }

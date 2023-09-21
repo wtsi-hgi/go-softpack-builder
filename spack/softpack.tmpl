@@ -1,0 +1,4 @@
+description: |{{ range .Description }}
+  {{ . }}{{ end }}
+packages:{{ range .Packages }}
+  - {{ .Name }}@{{ .Version }}{{ end }}

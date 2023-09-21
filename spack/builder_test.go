@@ -24,8 +24,12 @@
 package spack
 
 import (
+	"errors"
 	"io"
 	"log/slog"
+	"net/http"
+	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -36,11 +40,7 @@ import (
 	"github.com/wtsi-hgi/go-softpack-builder/config"
 )
 
-type Error string
-
-func (e Error) Error() string { return string(e) }
-
-const mockError = Error("Mock error")
+const ErrMock = Error("Mock error")
 
 type mockS3 struct {
 	ch             chan struct{}
@@ -55,7 +55,7 @@ func (m *mockS3) UploadData(data io.Reader, dest string) error {
 	defer close(m.ch)
 
 	if m.fail {
-		return mockError
+		return ErrMock
 	}
 
 	buff, err := io.ReadAll(data)
@@ -90,6 +90,14 @@ func (m *mockS3) OpenFile(source string) (io.ReadCloser, error) {
 		return io.NopCloser(strings.NewReader(m.exes)), nil
 	}
 
+	if filepath.Base(source) == builderOut {
+		return io.NopCloser(strings.NewReader("output")), nil
+	}
+
+	if filepath.Base(source) == spackLock {
+		return io.NopCloser(strings.NewReader(`{"_meta":{"file-type":"spack-lockfile","lockfile-version":5,"specfile-version":4},"spack":{"version":"0.21.0.dev0","type":"git","commit":"dac3b453879439fd733b03d0106cc6fe070f71f6"},"roots":[{"hash":"oibd5a4hphfkgshqiav4fdkvw4hsq4ek","spec":"xxhash arch=None-None-x86_64_v3"}, {"hash":"2ibd5a4hphfkgshqiav4fdkvw4hsq4e2","spec":"r-seurat arch=None-None-x86_64_v3"}],"concrete_specs":{"oibd5a4hphfkgshqiav4fdkvw4hsq4ek":{"name":"xxhash","version":"0.8.1","arch":{"platform":"linux","platform_os":"ubuntu22.04","target":"x86_64_v3"},"compiler":{"name":"gcc","version":"11.4.0"},"namespace":"builtin","parameters":{"build_system":"makefile","cflags":[],"cppflags":[],"cxxflags":[],"fflags":[],"ldflags":[],"ldlibs":[]},"package_hash":"wuj5b2kjnmrzhtjszqovcvgc3q46m6hoehmiccimi5fs7nmsw22a====","hash":"oibd5a4hphfkgshqiav4fdkvw4hsq4ek"},"2ibd5a4hphfkgshqiav4fdkvw4hsq4e2":{"name":"r-seurat","version":"4","arch":{"platform":"linux","platform_os":"ubuntu22.04","target":"x86_64_v3"},"compiler":{"name":"gcc","version":"11.4.0"},"namespace":"builtin","parameters":{"build_system":"makefile","cflags":[],"cppflags":[],"cxxflags":[],"fflags":[],"ldflags":[],"ldlibs":[]},"package_hash":"2uj5b2kjnmrzhtjszqovcvgc3q46m6hoehmiccimi5fs7nmsw222====","hash":"2ibd5a4hphfkgshqiav4fdkvw4hsq4e2"}}}`)), nil //nolint:lll
+	}
+
 	return nil, io.EOF
 }
 
@@ -103,7 +111,7 @@ func (m *mockWR) Run(cmd string) error {
 	defer close(m.ch)
 
 	if m.fail {
-		return mockError
+		return ErrMock
 	}
 
 	m.cmd = cmd
@@ -111,16 +119,53 @@ func (m *mockWR) Run(cmd string) error {
 	return nil
 }
 
+type mockCore struct {
+	files map[string]string
+}
+
+func (m *mockCore) ServeHTTP(_ http.ResponseWriter, r *http.Request) {
+	mr, err := r.MultipartReader()
+	if err != nil {
+		return
+	}
+
+	envPath, err := url.QueryUnescape(r.URL.RawQuery)
+	if err != nil {
+		return
+	}
+
+	for {
+		p, err := mr.NextPart()
+		if errors.Is(err, io.EOF) {
+			break
+		} else if err != nil {
+			return
+		}
+
+		name := p.FileName()
+
+		buf, err := io.ReadAll(p)
+		if err != nil {
+			return
+		}
+
+		m.files[filepath.Join(envPath, name)] = string(buf)
+	}
+}
+
 func TestBuilder(t *testing.T) {
 	Convey("Given binary cache and spack repo details and a Definition", t, func() {
+		ms3 := &mockS3{ch: make(chan struct{})}
+		mwr := &mockWR{ch: make(chan struct{})}
+		mc := &mockCore{files: make(map[string]string)}
+		msc := httptest.NewServer(mc)
+
 		var conf config.Config
 		conf.S3.BinaryCache = "s3://spack"
 		conf.S3.BuildBase = "some_path"
 		conf.CustomSpackRepo.URL = "https://github.com/spack/repo"
 		conf.CustomSpackRepo.Ref = "some_tag"
-
-		ms3 := &mockS3{ch: make(chan struct{})}
-		mwr := &mockWR{ch: make(chan struct{})}
+		conf.CoreURL = msc.URL
 
 		builder := &Builder{
 			config: &conf,
@@ -134,6 +179,7 @@ func TestBuilder(t *testing.T) {
 			def, err := builder.GenerateSingularityDef(def)
 
 			So(err, ShouldBeNil)
+			//nolint:lll
 			So(def, ShouldEqual, `Bootstrap: docker
 From: spack/ubuntu-jammy:latest
 Stage: build
@@ -216,7 +262,8 @@ Stage: final
 
 			<-ms3.ch
 			So(ms3.dest, ShouldEqual, "groups/hgi/xxhash/0.8.1/singularity.def")
-			So(ms3.data, ShouldContainSubstring, "specs:\n  - xxhash@0.8.1 arch=None-None-x86_64_v3\n  - r-seurat@4 arch=None-None-x86_64_v3\n  view")
+			So(ms3.data, ShouldContainSubstring, "specs:\n  - xxhash@0.8.1 arch=None-None-x86_64_v3\n"+
+				"  - r-seurat@4 arch=None-None-x86_64_v3\n  view")
 
 			<-mwr.ch
 			So(mwr.cmd, ShouldContainSubstring, "echo doing build in some_path/groups/hgi/xxhash/0.8.1; sudo singularity build")
@@ -256,6 +303,24 @@ Stage: final
 			So(err, ShouldBeNil)
 			So(logWriter.String(), ShouldBeBlank)
 
+			for file, expectedData := range map[string]string{
+				softpackYaml: `description: |
+  some help text
+packages:
+  - xxhash@0.8.1
+  - r-seurat@4
+`,
+				moduleForCoreBasename:  "module-whatis",
+				singularityDefBasename: "specs:\n  - xxhash@0.8.1 arch=None-None-x86_64_v3",
+				spackLock:              `"concrete_specs":`,
+				imageBasename:          "mock",
+				builderOut:             "output",
+			} {
+				data, ok := mc.files["groups/hgi/xxhash-0.8.1/"+file]
+				So(ok, ShouldBeTrue)
+				So(data, ShouldContainSubstring, expectedData)
+			}
+
 			// TODO: test same def can't be built more than once simultaneously
 		})
 
@@ -283,8 +348,6 @@ Stage: final
 			// TODO: the error log output from the run needs to be uploaded to
 			// env repo.
 		})
-
-		// TODO: implement and test SpackLockToSoftPackYML and AddArtifactsToRepo
 	})
 }
 
