@@ -37,7 +37,10 @@ import (
 	"github.com/wtsi-hgi/go-softpack-builder/wr"
 )
 
-const singularityDefBasename = "singularity.def"
+const (
+	singularityDefBasename = "singularity.def"
+	exesBasename           = "executables"
+)
 
 //go:embed singularity.tmpl
 var singularityTmplStr string
@@ -65,6 +68,7 @@ type Builder struct {
 	s3     interface {
 		UploadData(data io.Reader, dest string) error
 		DownloadFile(source, dest string) error
+		OpenFile(source string) (io.ReadCloser, error)
 	}
 	runner interface {
 		Run(deployment string) error
@@ -152,22 +156,27 @@ func (b *Builder) asyncBuild(def *Definition, wrInput, s3Path string) error {
 
 	defer os.RemoveAll(tmpDir)
 
-	imagePath := filepath.Join(tmpDir, "sif")
+	imagePath := filepath.Join(tmpDir, imageBasename)
 
-	err = b.s3.DownloadFile(filepath.Join(s3Path, "singularity.sif"), imagePath)
+	err = b.s3.DownloadFile(filepath.Join(s3Path, imageBasename), imagePath)
 	if err != nil {
 		return err
 	}
 
-	// and for spack.lock file
+	// and for spack.lock file, converting to a spack.yaml: SpackLockToSoftPackYML()
 
 	moduleFileData := def.ToModule(b.config.Module.InstallDir, b.config.Module.Dependencies)
 	// usageFileData := def.ModuleUsage(b.config.Module.LoadPath)
 
-	// get exes
-	// singularity run imagePath bash -c 'while read link; do readlink "\$link"; done < <(find $(echo $PATH | tr ":" "\n" | grep /opt/view/ | tr "\n" " ") -maxdepth 1 -executable)'
-	// and filter by requested packages
-	exes := []string{}
+	exeData, err := b.s3.OpenFile(filepath.Join(s3Path, exesBasename))
+	if err != nil {
+		return err
+	}
+
+	exes, err := executablesFileToExes(exeData)
+	if err != nil {
+		return err
+	}
 
 	imageFile, err := os.Open(imagePath)
 	if err != nil {
@@ -178,7 +187,16 @@ func (b *Builder) asyncBuild(def *Definition, wrInput, s3Path string) error {
 	err = InstallModule(b.config.Module.InstallDir, def,
 		strings.NewReader(moduleFileData), imageFile, exes, b.config.Module.WrapperScript)
 
-	// SpackLockToSoftPackYML and AddArtifactsToRepo
+	// AddArtifactsToRepo(imageFile, lockFile, concreteSpackYAMLFile)
 
 	return err
+}
+
+func executablesFileToExes(data io.Reader) ([]string, error) {
+	buf, err := io.ReadAll(data)
+	if err != nil {
+		return nil, err
+	}
+
+	return strings.Split(strings.TrimSpace(string(buf)), "\n"), nil
 }

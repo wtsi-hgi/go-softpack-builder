@@ -48,6 +48,7 @@ type mockS3 struct {
 	dest           string
 	downloadSource string
 	fail           bool
+	exes           string
 }
 
 func (m *mockS3) UploadData(data io.Reader, dest string) error {
@@ -82,6 +83,14 @@ func (m *mockS3) DownloadFile(source, dest string) error {
 	}
 
 	return f.Close()
+}
+
+func (m *mockS3) OpenFile(source string) (io.ReadCloser, error) {
+	if filepath.Base(source) == exesBasename {
+		return io.NopCloser(strings.NewReader(m.exes)), nil
+	}
+
+	return nil, io.EOF
 }
 
 type mockWR struct {
@@ -200,6 +209,8 @@ Stage: final
 
 		Convey("You can do a Build", func() {
 			conf.Module.InstallDir = t.TempDir()
+			conf.Module.WrapperScript = "/path/to/wrapper"
+			ms3.exes = "xxhsum\nxxh32sum\nxxh64sum\nxxh128sum\n"
 			err := builder.Build(def)
 			So(err, ShouldBeNil)
 
@@ -214,20 +225,26 @@ Stage: final
 				def.EnvironmentPath, def.EnvironmentName)
 
 			modulePath := filepath.Join(envPath, def.EnvironmentVersion)
-			imagePath := filepath.Join(envPath, def.EnvironmentVersion+scriptsDirSuffix, imageBasename)
+			scriptsPath := filepath.Join(envPath, def.EnvironmentVersion+scriptsDirSuffix)
+			imagePath := filepath.Join(scriptsPath, imageBasename)
+			expectedExes := []string{"xxhsum", "xxh32sum", "xxh64sum", "xxh128sum"}
+
+			expectedFiles := []string{modulePath, scriptsPath, imagePath}
+
+			for _, exe := range expectedExes {
+				expectedFiles = append(expectedFiles, filepath.Join(scriptsPath, exe))
+			}
 
 			ok := waitFor(func() bool {
-				// TODO: tests symlinks exist and were detected...
-				_, err = os.Stat(modulePath)
-				if err == nil {
-					_, err = os.Stat(imagePath)
-					if err == nil {
-						return true
+				for _, path := range expectedFiles {
+					if _, err = os.Lstat(path); err != nil {
+						return false
 					}
 				}
 
-				return false
+				return true
 			})
+			So(logWriter.String(), ShouldBeBlank)
 			So(ok, ShouldBeTrue)
 
 			So(ms3.downloadSource, ShouldEqual, "groups/hgi/xxhash/0.8.1/singularity.sif")
