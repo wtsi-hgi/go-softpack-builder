@@ -13,4 +13,4 @@ module-whatis "Packages: {{ range $index, $package := .Packages }}{{ if ne $inde
 {{ range .Dependencies -}}
 module load {{ . }}
 {{ end }}
-prepend-path PATH "{{ .InstallBase }}/{{ .EnvironmentPath }}/{{ .EnvironmentName }}/{{ .EnvironmentVersion}}-scripts"
+prepend-path PATH "{{ .InstallDir }}/{{ .EnvironmentPath }}/{{ .EnvironmentName }}/{{ .EnvironmentVersion}}-scripts"
