@@ -63,27 +63,6 @@ func init() {
 		"path to config file")
 }
 
-// cliPrint outputs the message to STDOUT.
-func cliPrint(msg string, a ...interface{}) {
-	fmt.Fprintf(os.Stdout, msg, a...)
-}
-
-// cliPrintRaw is like cliPrint, but does no interpretation of placeholders in
-// msg.
-func cliPrintRaw(msg string) {
-	fmt.Fprint(os.Stdout, msg)
-}
-
-// info is a convenience to log a message at the Info level.
-func info(msg string, a ...interface{}) {
-	slog.Info(fmt.Sprintf(msg, a...))
-}
-
-// warn is a convenience to log a message at the Warn level.
-func warn(msg string, a ...interface{}) {
-	slog.Warn(fmt.Sprintf(msg, a...))
-}
-
 // die is a convenience to log a message at the Error level and exit non zero.
 func die(msg string, a ...interface{}) {
 	slog.Error(fmt.Sprintf(msg, a...))

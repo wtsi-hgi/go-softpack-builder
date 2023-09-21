@@ -49,6 +49,7 @@ func New(bucketPath string) (*S3, error) {
 
 func (s *S3) UploadData(data io.Reader, dest string) error {
 	dest = s.RemotePath(dest)
+
 	return s.S3Accessor.UploadData(data, dest)
 }
 

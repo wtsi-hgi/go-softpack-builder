@@ -44,6 +44,7 @@ func InstallModule(installBase string, def *Definition, module, image io.Reader,
 	}
 
 	modulePath := filepath.Join(installDir, def.EnvironmentVersion)
+
 	f, err := os.OpenFile(modulePath, flags, perms)
 	if err != nil {
 		return err
@@ -64,6 +65,7 @@ func InstallModule(installBase string, def *Definition, module, image io.Reader,
 	f, err = os.OpenFile(imagePath, flags, perms)
 	if err != nil {
 		os.Remove(modulePath)
+
 		return err
 	}
 

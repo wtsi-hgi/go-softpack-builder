@@ -38,7 +38,7 @@ func serverCmd(_ *cobra.Command, _ []string) {
 	if configPath == "" {
 		home, err := os.UserHomeDir()
 		if err != nil {
-			die(err.Error())
+			die("could not get home dir: %s", err)
 		}
 
 		configPath = filepath.Join(home, ".softpack", "builder", "gsb-config.yml")
@@ -46,23 +46,23 @@ func serverCmd(_ *cobra.Command, _ []string) {
 
 	f, err := os.Open(configPath)
 	if err != nil {
-		die(err.Error())
+		die("could not open config file: %s", err)
 	}
 
 	conf, err := config.Parse(f)
 	f.Close()
 
 	if err != nil {
-		die(err.Error())
+		die("could not parse config file: %s", err)
 	}
 
 	b, err := build.New(conf)
 	if err != nil {
-		die(err.Error())
+		die("could not create a builder: %s", err)
 	}
 
 	err = http.ListenAndServe(conf.ListenURL, server.New(b)) //nolint:gosec
 	if err != nil {
-		die(err.Error())
+		die("could not start server: %s", err)
 	}
 }

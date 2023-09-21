@@ -27,7 +27,6 @@ import (
 	"testing"
 
 	. "github.com/smartystreets/goconvey/convey"
-
 	"github.com/wtsi-hgi/go-softpack-builder/internal"
 )
 

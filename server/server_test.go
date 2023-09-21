@@ -30,7 +30,6 @@ import (
 	"testing"
 
 	. "github.com/smartystreets/goconvey/convey"
-
 	"github.com/wtsi-hgi/go-softpack-builder/build"
 )
 
@@ -40,18 +39,19 @@ type mockBuilder struct {
 
 func (m *mockBuilder) Build(def *build.Definition) error {
 	m.received = def
+
 	return nil
 }
 
 func TestServer(t *testing.T) {
-	Convey("Given a mock Builder and test http server, core posts result in a Definition being sent to Build()", t, func() {
+	Convey("Core posts result in a Definition being sent to Build()", t, func() {
 		mb := new(mockBuilder)
 
 		handler := New(mb)
 		server := httptest.NewServer(handler)
 		So(server, ShouldNotBeNil)
 
-		resp, err := server.Client().Post(server.URL+"/environments/build", "application/json",
+		resp, err := server.Client().Post(server.URL+"/environments/build", "application/json", //nolint:noctx
 			strings.NewReader(`
 {
 	"name": "users/user/myenv",

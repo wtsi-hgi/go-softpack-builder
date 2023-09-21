@@ -37,6 +37,7 @@ func TestS3(t *testing.T) {
 	s3bucketPath := os.Getenv("GSB_S3_TEST_PATH")
 	if s3bucketPath == "" {
 		SkipConvey("skipping S3 tests since GSB_S3_TEST_PATH not set", t, func() {})
+
 		return
 	}
 
@@ -54,7 +55,7 @@ func TestS3(t *testing.T) {
 			err = s3.UploadData(strings.NewReader(testData), basename)
 			So(err, ShouldBeNil)
 
-			defer s3.DeleteFile(basePath + "/" + basename)
+			defer s3.DeleteFile(basePath + "/" + basename) //nolint:errcheck
 
 			entries, err := s3.ListEntries(basePath + "/")
 			So(err, ShouldBeNil)

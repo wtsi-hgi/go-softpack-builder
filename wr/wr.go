@@ -26,17 +26,22 @@ package wr
 import (
 	"bytes"
 	_ "embed"
-	"errors"
 	"os/exec"
 	"strings"
 	"text/template"
 )
 
+type Error struct {
+	msg string
+}
+
+func (e Error) Error() string { return "wr add failed: " + e.msg }
+
 //go:embed wr.tmpl
 var wrTmplStr string
-var wrTmpl *template.Template
+var wrTmpl *template.Template //nolint:gochecknoglobals
 
-func init() {
+func init() { //nolint:gochecknoinits
 	wrTmpl = template.Must(template.New("").Parse(wrTmplStr))
 }
 
@@ -62,7 +67,9 @@ func (r *Runner) Run(wrInput string) error {
 	cmd := exec.Command("wr", "add", "--deployment", r.deployment, "--sync", //nolint:gosec
 		"--time", "8h", "--memory", "8G", "--rerun")
 	cmd.Stdin = strings.NewReader(wrInput)
+
 	var std bytes.Buffer
+
 	cmd.Stdout = &std
 	cmd.Stderr = &std
 
@@ -73,7 +80,7 @@ func (r *Runner) Run(wrInput string) error {
 			errStr = err.Error()
 		}
 
-		return errors.New(errStr)
+		return Error{msg: errStr}
 	}
 
 	return nil

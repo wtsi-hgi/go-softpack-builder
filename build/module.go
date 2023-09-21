@@ -32,13 +32,13 @@ import (
 
 //go:embed module.tmpl
 var moduleTmplStr string
-var moduleTmpl *template.Template
+var moduleTmpl *template.Template //nolint:gochecknoglobals
 
 //go:embed usage.tmpl
 var usageTmplStr string
-var usageTmpl *template.Template
+var usageTmpl *template.Template //nolint:gochecknoglobals
 
-func init() {
+func init() { //nolint:gochecknoinits
 	moduleTmpl = template.Must(template.New("").Parse(moduleTmplStr))
 	usageTmpl = template.Must(template.New("").Parse(usageTmplStr))
 }
@@ -46,7 +46,7 @@ func init() {
 func (d *Definition) ToModule(installDir string, deps []string) string {
 	var sb strings.Builder
 
-	moduleTmpl.Execute(&sb, struct {
+	moduleTmpl.Execute(&sb, struct { //nolint:errcheck
 		InstallDir   string
 		Dependencies []string
 		*Definition
@@ -62,7 +62,9 @@ func (d *Definition) ToModule(installDir string, deps []string) string {
 func (d *Definition) ModuleUsage(loadPath string) string {
 	var sb strings.Builder
 
-	usageTmpl.Execute(&sb, filepath.Join(loadPath, d.EnvironmentPath, d.EnvironmentName, d.EnvironmentVersion))
+	usageTmpl.Execute(&sb, filepath.Join( //nolint:errcheck
+		loadPath, d.EnvironmentPath, d.EnvironmentName, d.EnvironmentVersion,
+	))
 
 	return sb.String()
 }

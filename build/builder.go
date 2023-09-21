@@ -25,6 +25,7 @@ package build
 
 import (
 	"bytes"
+	"context"
 	_ "embed"
 	"encoding/json"
 	"io"
@@ -272,15 +273,15 @@ func SpackLockToSoftPackYML(data []byte, desc string) (io.Reader, error) {
 		return nil, err
 	}
 
-	var concreteSpecs []ConcreteSpec
+	concreteSpecs := make([]ConcreteSpec, len(sl.Roots))
 
-	for _, root := range sl.Roots {
+	for i, root := range sl.Roots {
 		concrete, ok := sl.ConcreteSpecs[root.Hash]
 		if !ok {
 			return nil, ErrInvalidJSON
 		}
 
-		concreteSpecs = append(concreteSpecs, concrete)
+		concreteSpecs[i] = concrete
 	}
 
 	var sb strings.Builder
@@ -303,19 +304,41 @@ func (b *Builder) AddArtifactsToRepo(image, lock, softpackYML, singDef, log, mod
 	writer := multipart.NewWriter(pw)
 	errCh := make(chan error, 1)
 
-	go func() {
-		_, err := http.Post(b.config.CoreURL+"?"+url.QueryEscape(envPath), writer.FormDataContentType(), pr)
-		errCh <- err
-	}()
+	ctx, cancelFunc := context.WithCancel(context.Background())
+	defer cancelFunc()
 
-	for name, r := range map[string]io.Reader{
+	m := map[string]io.Reader{
 		imageBasename:          image,
 		spackLock:              lock,
 		softpackYaml:           softpackYML,
 		singularityDefBasename: singDef,
 		builderOut:             log,
 		moduleForCoreBasename:  module,
-	} {
+	}
+
+	go func() {
+		errCh <- sendFormFiles(m, writer, pw)
+	}()
+
+	defer pw.Close()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, b.config.CoreURL+"?"+url.QueryEscape(envPath), pr)
+	if err != nil {
+		return err
+	}
+
+	req.Header.Add("Content-Type", writer.FormDataContentType())
+
+	_, err = http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+
+	return <-errCh
+}
+
+func sendFormFiles(m map[string]io.Reader, writer *multipart.Writer, writerInput io.Closer) error {
+	for name, r := range m {
 		part, err := writer.CreateFormFile("file", name)
 		if err != nil {
 			return err
@@ -332,10 +355,5 @@ func (b *Builder) AddArtifactsToRepo(image, lock, softpackYML, singDef, log, mod
 		return err
 	}
 
-	err = pw.Close()
-	if err != nil {
-		return err
-	}
-
-	return <-errCh
+	return writerInput.Close()
 }
