@@ -29,9 +29,9 @@ import (
 	"path/filepath"
 
 	"github.com/spf13/cobra"
+	"github.com/wtsi-hgi/go-softpack-builder/build"
 	"github.com/wtsi-hgi/go-softpack-builder/config"
 	"github.com/wtsi-hgi/go-softpack-builder/server"
-	"github.com/wtsi-hgi/go-softpack-builder/spack"
 )
 
 func serverCmd(_ *cobra.Command, _ []string) {
@@ -56,7 +56,7 @@ func serverCmd(_ *cobra.Command, _ []string) {
 		die(err.Error())
 	}
 
-	b, err := spack.New(conf)
+	b, err := build.New(conf)
 	if err != nil {
 		die(err.Error())
 	}

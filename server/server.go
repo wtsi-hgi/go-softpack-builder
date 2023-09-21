@@ -29,11 +29,11 @@ import (
 	"net/http"
 	"path"
 
-	"github.com/wtsi-hgi/go-softpack-builder/spack"
+	"github.com/wtsi-hgi/go-softpack-builder/build"
 )
 
 type Builder interface {
-	Build(*spack.Definition) error
+	Build(*build.Definition) error
 }
 
 type request struct {
@@ -41,7 +41,7 @@ type request struct {
 	Version string
 	Model   struct {
 		Description string
-		Packages    []spack.Package
+		Packages    []build.Package
 	}
 }
 
@@ -57,7 +57,7 @@ func New(b Builder) http.Handler {
 			return
 		}
 
-		def := new(spack.Definition)
+		def := new(build.Definition)
 		def.EnvironmentPath, def.EnvironmentName = path.Split(req.Name)
 		def.EnvironmentVersion = req.Version
 		def.Description = req.Model.Description

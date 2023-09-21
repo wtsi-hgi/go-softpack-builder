@@ -31,14 +31,14 @@ import (
 
 	. "github.com/smartystreets/goconvey/convey"
 
-	"github.com/wtsi-hgi/go-softpack-builder/spack"
+	"github.com/wtsi-hgi/go-softpack-builder/build"
 )
 
 type mockBuilder struct {
-	received *spack.Definition
+	received *build.Definition
 }
 
-func (m *mockBuilder) Build(def *spack.Definition) error {
+func (m *mockBuilder) Build(def *build.Definition) error {
 	m.received = def
 	return nil
 }
@@ -64,12 +64,12 @@ func TestServer(t *testing.T) {
 `))
 		So(err, ShouldBeNil)
 		So(resp.StatusCode, ShouldEqual, http.StatusOK)
-		So(mb.received, ShouldResemble, &spack.Definition{
+		So(mb.received, ShouldResemble, &build.Definition{
 			EnvironmentPath:    "users/user/",
 			EnvironmentName:    "myenv",
 			EnvironmentVersion: "0.8.1",
 			Description:        "help text",
-			Packages: []spack.Package{
+			Packages: []build.Package{
 				{
 					Name:    "xxhash",
 					Version: "0.8.1",
