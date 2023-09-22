@@ -43,6 +43,10 @@ func init() { //nolint:gochecknoinits
 	usageTmpl = template.Must(template.New("").Parse(usageTmplStr))
 }
 
+// ToModule creates a tcl module based on our packages, and uses installDir to
+// prepend a PATH for the exe wrapper scripts that will be at the installed
+// location of the module. Any supplied module dependencies will be module
+// loaded.
 func (d *Definition) ToModule(installDir string, deps []string) string {
 	var sb strings.Builder
 
@@ -59,6 +63,8 @@ func (d *Definition) ToModule(installDir string, deps []string) string {
 	return sb.String()
 }
 
+// ModuleUsage returns a markdown formatted usage that tells a user to module
+// load our environment installed in the given loadPath.
 func (d *Definition) ModuleUsage(loadPath string) string {
 	var sb strings.Builder
 

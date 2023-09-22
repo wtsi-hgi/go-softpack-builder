@@ -36,7 +36,7 @@ const (
 	flags            = os.O_EXCL | os.O_CREATE | os.O_WRONLY
 )
 
-func InstallModule(installBase string, def *Definition, module,
+func installModule(installBase string, def *Definition, module,
 	image io.Reader, exes []string, wrapperScript string) (err error) {
 	var installDir, scriptsDir string
 

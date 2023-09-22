@@ -443,7 +443,7 @@ func (b *Builder) prepareAndInstallArtifacts(def *Definition, s3Path, imagePath,
 	}
 	defer imageFile.Close()
 
-	return InstallModule(b.config.Module.InstallDir, def,
+	return installModule(b.config.Module.InstallDir, def,
 		strings.NewReader(moduleFileData), imageFile, exes, b.config.Module.WrapperScript)
 }
 

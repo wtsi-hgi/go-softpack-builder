@@ -46,7 +46,7 @@ func TestInstall(t *testing.T) {
 		exes := []string{"a", "b"}
 		wrapperScript := filepath.Join(tmpDir, "wrapper.script")
 
-		err := InstallModule(tmpDir, def, strings.NewReader(moduleFile), strings.NewReader(imageFile), exes, wrapperScript)
+		err := installModule(tmpDir, def, strings.NewReader(moduleFile), strings.NewReader(imageFile), exes, wrapperScript)
 		So(err, ShouldBeNil)
 
 		createdModuleFile := readFile(filepath.Join(tmpDir, def.EnvironmentPath, def.EnvironmentName, def.EnvironmentVersion))
