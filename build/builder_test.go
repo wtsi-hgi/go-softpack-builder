@@ -240,7 +240,7 @@ func TestBuilder(t *testing.T) {
 		def := getExampleDefinition()
 
 		Convey("You can generate a singularity .def", func() {
-			def, err := builder.GenerateSingularityDef(def)
+			def, err := builder.generateSingularityDef(def)
 
 			So(err, ShouldBeNil)
 			//nolint:lll
