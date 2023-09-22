@@ -30,7 +30,7 @@ race:
 	@go test -tags netgo -race --count 1 .
 	@go test -tags netgo -race --count 1 $(shell go list ./... | tail -n+2)
 
-# curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.52.2
+# curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.54.2
 lint:
 	@golangci-lint run
 
