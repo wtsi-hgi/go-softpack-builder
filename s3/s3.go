@@ -29,10 +29,15 @@ import (
 	"github.com/VertebrateResequencing/muxfys"
 )
 
+// S3 lets you upload data to S3 and retrieve it.
 type S3 struct {
 	*muxfys.S3Accessor
 }
 
+// New returns an S3 that gets your S3 credentials from ~/.s3cfg. The bucketPath
+// will be checked for accessibility. Only the first "directory" of the path,
+// actual bucket name, will be checked and stored as a root for the other method
+// paths.
 func New(bucketPath string) (*S3, error) {
 	config, err := muxfys.S3ConfigFromEnvironment("", bucketPath)
 	if err != nil {
@@ -47,18 +52,22 @@ func New(bucketPath string) (*S3, error) {
 	return &S3{S3Accessor: accessor}, nil
 }
 
+// UploadData uploads the given data to bucket/dest.
 func (s *S3) UploadData(data io.Reader, dest string) error {
 	dest = s.RemotePath(dest)
 
 	return s.S3Accessor.UploadData(data, dest)
 }
 
+// DownloadFile downloads the given S3 bucket/source object to dest path on
+// local disk.
 func (s *S3) DownloadFile(source, dest string) error {
 	source = s.RemotePath(source)
 
 	return s.S3Accessor.DownloadFile(source, dest)
 }
 
+// OpenFile lets you stream the given S3 bucket/source object.
 func (s *S3) OpenFile(source string) (io.ReadCloser, error) {
 	source = s.RemotePath(source)
 
