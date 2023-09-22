@@ -49,7 +49,6 @@ func TestServer(t *testing.T) {
 
 		handler := New(mb)
 		server := httptest.NewServer(handler)
-		So(server, ShouldNotBeNil)
 
 		resp, err := server.Client().Post(server.URL+"/environments/build", "application/json", //nolint:noctx
 			strings.NewReader(`

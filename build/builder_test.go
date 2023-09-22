@@ -33,6 +33,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -51,6 +52,7 @@ type mockS3 struct {
 	downloadSource string
 	fail           bool
 	exes           string
+	mu             sync.Mutex
 }
 
 func (m *mockS3) UploadData(data io.Reader, dest string) error {
@@ -72,6 +74,9 @@ func (m *mockS3) UploadData(data io.Reader, dest string) error {
 }
 
 func (m *mockS3) DownloadFile(source, dest string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
 	m.downloadSource = source
 
 	f, err := os.Create(dest)
@@ -135,7 +140,24 @@ func (m *modifyRunner) Run(_ string) error {
 }
 
 type mockCore struct {
+	mu    sync.RWMutex
 	files map[string]string
+}
+
+func (m *mockCore) setFile(filename, contents string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.files[filename] = contents
+}
+
+func (m *mockCore) getFile(filename string) (string, bool) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	contents, ok := m.files[filename]
+
+	return contents, ok
 }
 
 func (m *mockCore) ServeHTTP(_ http.ResponseWriter, r *http.Request) {
@@ -164,8 +186,34 @@ func (m *mockCore) ServeHTTP(_ http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		m.files[filepath.Join(envPath, name)] = string(buf)
+		m.setFile(filepath.Join(envPath, name), string(buf))
 	}
+}
+
+type concurrentStringBuilder struct {
+	mu sync.RWMutex
+	strings.Builder
+}
+
+func (c *concurrentStringBuilder) Write(p []byte) (int, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	return c.Builder.Write(p)
+}
+
+func (c *concurrentStringBuilder) WriteString(str string) (int, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	return c.Builder.WriteString(str)
+}
+
+func (c *concurrentStringBuilder) String() string {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	return c.Builder.String()
 }
 
 func TestBuilder(t *testing.T) {
@@ -266,7 +314,7 @@ Stage: final
 `)
 		})
 
-		var logWriter strings.Builder
+		var logWriter concurrentStringBuilder
 		slog.SetDefault(slog.New(slog.NewTextHandler(&logWriter, nil)))
 
 		Convey("You can do a Build", func() {
@@ -311,7 +359,9 @@ Stage: final
 			So(logWriter.String(), ShouldBeBlank)
 			So(ok, ShouldBeTrue)
 
+			ms3.mu.Lock()
 			So(ms3.downloadSource, ShouldEqual, "groups/hgi/xxhash/0.8.1/singularity.sif")
+			ms3.mu.Unlock()
 
 			_, err = os.Stat(modulePath)
 			So(err, ShouldBeNil)
@@ -334,7 +384,7 @@ packages:
 				builderOut:             "output",
 				usageBasename:          "module load " + moduleLoadPrefix + "/groups/hgi/xxhash/0.8.1",
 			} {
-				data, ok := mc.files["groups/hgi/xxhash-0.8.1/"+file]
+				data, ok := mc.getFile("groups/hgi/xxhash-0.8.1/" + file)
 				So(ok, ShouldBeTrue)
 				So(data, ShouldContainSubstring, expectedData)
 			}
@@ -361,7 +411,7 @@ packages:
 			So(logWriter.String(), ShouldContainSubstring,
 				"msg=\"Async part of build failed\" err=\"Mock error\" s3Path=some_path/groups/hgi/xxhash/0.8.1")
 
-			data, ok := mc.files["groups/hgi/xxhash-0.8.1/"+builderOut]
+			data, ok := mc.getFile("groups/hgi/xxhash-0.8.1/" + builderOut)
 			So(ok, ShouldBeTrue)
 			So(data, ShouldContainSubstring, "output")
 		})

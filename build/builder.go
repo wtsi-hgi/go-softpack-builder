@@ -76,11 +76,17 @@ const (
 	ErrEnvironmentBuilding = Error("build already running for environment")
 )
 
+// Package describes the name and optional version of a spack package.
 type Package struct {
 	Name    string
 	Version string
 }
 
+// Definition describes the environment a user wanted to create, which
+// comprises a EnvironmentPath such as "users/username", and EnvironmentName
+// such as "mainpackage", and EnvironmentVersion, such as "1". The given
+// Packages will be installed for this Environment, and the Description will
+// become the help text for making use of the Packages.
 type Definition struct {
 	EnvironmentPath    string
 	EnvironmentName    string
@@ -89,6 +95,9 @@ type Definition struct {
 	Packages           []Package
 }
 
+// FullEnvironmentPath returns the complete environment path: the location under
+// environments in the environments git repository that the artefacts will be
+// stored.
 func (d *Definition) FullEnvironmentPath() string {
 	return filepath.Join(d.EnvironmentPath, d.EnvironmentName+"-"+d.EnvironmentVersion)
 }
