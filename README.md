@@ -101,6 +101,7 @@ Where:
 Start the builder service:
 
 ```
+export WR_CONFIG_DIR=/path/to/openstack
 gsb &
 ```
 
@@ -130,5 +131,9 @@ HEREDOC
 ```
 
 This should result in a job running in your wr manager that creates the
-singularity image file and other artifacts in your S3 buildBase. The overall
-task will fail when gsb tries to send the artifacts to the core, however.
+singularity image file and other artifacts in your S3 buildBase. The module
+wrapper for the image will be installed.
+
+Only the last step when gsb tries to send the artifacts to the core, will fail,
+but you'll at least have a usable software installation of the environment that
+can be tested and used.

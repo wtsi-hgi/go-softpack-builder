@@ -252,14 +252,60 @@ func (b *Builder) asyncBuild(def *Definition, wrInput, s3Path, singDef string) e
 	defer os.RemoveAll(tmpDir)
 
 	imagePath := filepath.Join(tmpDir, imageBasename)
-
-	moduleFileData := def.ToModule(b.config.Module.InstallDir, b.config.Module.Dependencies)
-
-	if err = b.prepareArtifactsFromS3AndSendToCore(def, s3Path, imagePath, moduleFileData, singDef); err != nil {
+	if err = b.s3.DownloadFile(filepath.Join(s3Path, imageBasename), imagePath); err != nil {
 		return err
 	}
 
-	return b.prepareAndInstallArtifacts(def, s3Path, imagePath, moduleFileData)
+	moduleFileData := def.ToModule(b.config.Module.InstallDir, b.config.Module.Dependencies)
+
+	if err = b.prepareAndInstallArtifacts(def, s3Path, imagePath, moduleFileData); err != nil {
+		return err
+	}
+
+	return b.prepareArtifactsFromS3AndSendToCore(def, s3Path, imagePath, moduleFileData, singDef)
+}
+
+func (b *Builder) addLogToRepo(s3Path, environmentPath string) {
+	log, err := b.s3.OpenFile(filepath.Join(s3Path, builderOut))
+	if err != nil {
+		slog.Error("error getting build log file", "err", err)
+	}
+
+	if err := b.addArtifactsToRepo(map[string]io.Reader{
+		builderOut: log,
+	}, environmentPath); err != nil {
+		slog.Error("error sending build log file to core", "err", err)
+	}
+}
+
+func (b *Builder) prepareAndInstallArtifacts(def *Definition, s3Path, imagePath, moduleFileData string) error {
+	exeData, err := b.s3.OpenFile(filepath.Join(s3Path, exesBasename))
+	if err != nil {
+		return err
+	}
+
+	exes, err := executablesFileToExes(exeData)
+	if err != nil {
+		return err
+	}
+
+	imageFile, err := os.Open(imagePath)
+	if err != nil {
+		return err
+	}
+	defer imageFile.Close()
+
+	return installModule(b.config.Module.InstallDir, def,
+		strings.NewReader(moduleFileData), imageFile, exes, b.config.Module.WrapperScript)
+}
+
+func executablesFileToExes(data io.Reader) ([]string, error) {
+	buf, err := io.ReadAll(data)
+	if err != nil {
+		return nil, err
+	}
+
+	return strings.Split(strings.TrimSpace(string(buf)), "\n"), nil
 }
 
 func (b *Builder) prepareArtifactsFromS3AndSendToCore(def *Definition, s3Path,
@@ -290,24 +336,7 @@ func (b *Builder) prepareArtifactsFromS3AndSendToCore(def *Definition, s3Path,
 	)
 }
 
-func (b *Builder) addLogToRepo(s3Path, environmentPath string) {
-	log, err := b.s3.OpenFile(filepath.Join(s3Path, builderOut))
-	if err != nil {
-		slog.Error("error getting build log file", "err", err)
-	}
-
-	if err := b.addArtifactsToRepo(map[string]io.Reader{
-		builderOut: log,
-	}, environmentPath); err != nil {
-		slog.Error("error sending build log file to core", "err", err)
-	}
-}
-
 func (b *Builder) getArtifactDataFromS3(s3Path, imagePath string) (io.Reader, []byte, io.ReadCloser, error) {
-	if err := b.s3.DownloadFile(filepath.Join(s3Path, imageBasename), imagePath); err != nil {
-		return nil, nil, nil, err
-	}
-
 	logData, err := b.s3.OpenFile(filepath.Join(s3Path, builderOut))
 	if err != nil {
 		return nil, nil, nil, err
@@ -424,34 +453,4 @@ func sendFormFiles(artifacts map[string]io.Reader, //nolint:misspell
 	}
 
 	return writerInput.Close()
-}
-
-func (b *Builder) prepareAndInstallArtifacts(def *Definition, s3Path, imagePath, moduleFileData string) error {
-	exeData, err := b.s3.OpenFile(filepath.Join(s3Path, exesBasename))
-	if err != nil {
-		return err
-	}
-
-	exes, err := executablesFileToExes(exeData)
-	if err != nil {
-		return err
-	}
-
-	imageFile, err := os.Open(imagePath)
-	if err != nil {
-		return err
-	}
-	defer imageFile.Close()
-
-	return installModule(b.config.Module.InstallDir, def,
-		strings.NewReader(moduleFileData), imageFile, exes, b.config.Module.WrapperScript)
-}
-
-func executablesFileToExes(data io.Reader) ([]string, error) {
-	buf, err := io.ReadAll(data)
-	if err != nil {
-		return nil, err
-	}
-
-	return strings.Split(strings.TrimSpace(string(buf)), "\n"), nil
 }
