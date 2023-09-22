@@ -31,6 +31,7 @@ import (
 	yaml "gopkg.in/yaml.v3"
 )
 
+// Config holds our config options.
 type Config struct {
 	S3 struct {
 		BinaryCache string `yaml:"binaryCache"`
@@ -51,6 +52,7 @@ type Config struct {
 	WRDeployment string `yaml:"wrDeployment"`
 }
 
+// Parse parses a YAML file of our config options.
 func Parse(r io.Reader) (*Config, error) {
 	c := new(Config)
 	if err := yaml.NewDecoder(r).Decode(c); err != nil {
