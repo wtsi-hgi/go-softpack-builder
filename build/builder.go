@@ -36,6 +36,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"text/template"
 
 	"github.com/wtsi-hgi/go-softpack-builder/config"
@@ -70,7 +71,10 @@ type Error string
 
 func (e Error) Error() string { return string(e) }
 
-const ErrInvalidJSON = Error("invalid spack lock JSON")
+const (
+	ErrInvalidJSON         = Error("invalid spack lock JSON")
+	ErrEnvironmentBuilding = Error("build already running for environment")
+)
 
 type Package struct {
 	Name    string
@@ -99,6 +103,9 @@ type Builder struct {
 	runner interface {
 		Run(deployment string) error
 	}
+
+	mu                  sync.Mutex
+	runningEnvironments map[string]bool
 }
 
 // New takes the s3 build cache URL, the repo and checkout reference of your
@@ -110,9 +117,10 @@ func New(config *config.Config) (*Builder, error) {
 	}
 
 	return &Builder{
-		config: config,
-		s3:     s3helper,
-		runner: wr.New(config.WRDeployment),
+		config:              config,
+		s3:                  s3helper,
+		runner:              wr.New(config.WRDeployment),
+		runningEnvironments: make(map[string]bool),
 	}, nil
 }
 
@@ -135,37 +143,81 @@ func (b *Builder) GenerateSingularityDef(def *Definition) (string, error) {
 	return w.String(), err
 }
 
-func (b *Builder) Build(def *Definition) error {
-	singDef, err := b.GenerateSingularityDef(def)
+func (b *Builder) Build(def *Definition) (err error) {
+	var fn func()
+
+	fn, err = b.protectEnvironment(def.FullEnvironmentPath(), &err)
 	if err != nil {
 		return err
 	}
 
-	s3Path := filepath.Join(
-		def.EnvironmentPath, def.EnvironmentName,
-		def.EnvironmentVersion,
-	)
+	defer fn()
 
-	singDefUploadPath := filepath.Join(s3Path, singularityDefBasename)
+	var singDef, wrInput string
 
-	if err = b.s3.UploadData(strings.NewReader(singDef), singDefUploadPath); err != nil {
+	s3Path := filepath.Join(def.EnvironmentPath, def.EnvironmentName, def.EnvironmentVersion)
+
+	if singDef, err = b.generateAndUploadSingularityDef(def, s3Path); err != nil {
 		return err
 	}
 
 	singDefParentPath := filepath.Join(b.config.S3.BuildBase, s3Path)
 
-	wrInput, err := wr.SingularityBuildInS3WRInput(singDefParentPath)
+	wrInput, err = wr.SingularityBuildInS3WRInput(singDefParentPath)
 	if err != nil {
 		return err
 	}
 
-	go func() {
-		if errb := b.asyncBuild(def, wrInput, s3Path, singDef); errb != nil {
-			slog.Error("Async part of build failed", "err", errb.Error(), "s3Path", singDefParentPath)
-		}
-	}()
+	go b.startBuild(def, wrInput, s3Path, singDef, singDefParentPath)
 
 	return nil
+}
+
+func (b *Builder) protectEnvironment(envPath string, err *error) (func(), error) {
+	b.mu.Lock()
+
+	if b.runningEnvironments[envPath] {
+		b.mu.Unlock()
+
+		return nil, ErrEnvironmentBuilding
+	}
+
+	b.runningEnvironments[envPath] = true
+
+	b.mu.Unlock()
+
+	return func() {
+		if *err != nil {
+			b.unprotectEnvironment(envPath)
+		}
+	}, nil
+}
+
+func (b *Builder) unprotectEnvironment(envPath string) {
+	b.mu.Lock()
+	delete(b.runningEnvironments, envPath)
+	b.mu.Unlock()
+}
+
+func (b *Builder) generateAndUploadSingularityDef(def *Definition, s3Path string) (string, error) {
+	singDef, err := b.GenerateSingularityDef(def)
+	if err != nil {
+		return "", err
+	}
+
+	singDefUploadPath := filepath.Join(s3Path, singularityDefBasename)
+
+	err = b.s3.UploadData(strings.NewReader(singDef), singDefUploadPath)
+
+	return singDef, err
+}
+
+func (b *Builder) startBuild(def *Definition, wrInput, s3Path, singDef, singDefParentPath string) {
+	defer b.unprotectEnvironment(def.FullEnvironmentPath())
+
+	if err := b.asyncBuild(def, wrInput, s3Path, singDef); err != nil {
+		slog.Error("Async part of build failed", "err", err.Error(), "s3Path", singDefParentPath)
+	}
 }
 
 func (b *Builder) asyncBuild(def *Definition, wrInput, s3Path, singDef string) error {

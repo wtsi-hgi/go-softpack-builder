@@ -38,9 +38,11 @@ import (
 
 	. "github.com/smartystreets/goconvey/convey"
 	"github.com/wtsi-hgi/go-softpack-builder/config"
+	"github.com/wtsi-hgi/go-softpack-builder/wr"
 )
 
 const ErrMock = Error("Mock error")
+const moduleLoadPrefix = "HGI/softpack"
 
 type mockS3 struct {
 	ch             chan struct{}
@@ -119,6 +121,19 @@ func (m *mockWR) Run(cmd string) error {
 	return nil
 }
 
+type modifyRunner struct {
+	cmd string
+	*wr.Runner
+	ch chan bool
+}
+
+func (m *modifyRunner) Run(_ string) error {
+	err := m.Runner.Run(m.cmd)
+	m.ch <- true
+
+	return err
+}
+
 type mockCore struct {
 	files map[string]string
 }
@@ -168,9 +183,10 @@ func TestBuilder(t *testing.T) {
 		conf.CoreURL = msc.URL
 
 		builder := &Builder{
-			config: &conf,
-			s3:     ms3,
-			runner: mwr,
+			config:              &conf,
+			s3:                  ms3,
+			runner:              mwr,
+			runningEnvironments: make(map[string]bool),
 		}
 
 		def := getExampleDefinition()
@@ -256,7 +272,7 @@ Stage: final
 		Convey("You can do a Build", func() {
 			conf.Module.InstallDir = t.TempDir()
 			conf.Module.WrapperScript = "/path/to/wrapper"
-			conf.Module.LoadPath = "HGI/softpack"
+			conf.Module.LoadPath = moduleLoadPrefix
 			ms3.exes = "xxhsum\nxxh32sum\nxxh64sum\nxxh128sum\n"
 			err := builder.Build(def)
 			So(err, ShouldBeNil)
@@ -316,14 +332,12 @@ packages:
 				spackLock:              `"concrete_specs":`,
 				imageBasename:          "mock",
 				builderOut:             "output",
-				usageBasename:          "module load HGI/softpack/groups/hgi/xxhash/0.8.1",
+				usageBasename:          "module load " + moduleLoadPrefix + "/groups/hgi/xxhash/0.8.1",
 			} {
 				data, ok := mc.files["groups/hgi/xxhash-0.8.1/"+file]
 				So(ok, ShouldBeTrue)
 				So(data, ShouldContainSubstring, expectedData)
 			}
-
-			// TODO: test same def can't be built more than once simultaneously
 		})
 
 		Convey("Build returns an error if the upload fails", func() {
@@ -350,6 +364,28 @@ packages:
 			data, ok := mc.files["groups/hgi/xxhash-0.8.1/"+builderOut]
 			So(ok, ShouldBeTrue)
 			So(data, ShouldContainSubstring, "output")
+		})
+
+		Convey("You can't run the same build simultaneously", func() {
+			conf.Module.InstallDir = t.TempDir()
+			conf.Module.WrapperScript = "/path/to/wrapper"
+			conf.Module.LoadPath = moduleLoadPrefix
+			ms3.exes = "xxhsum\nxxh32sum\nxxh64sum\nxxh128sum\n"
+
+			mr := &modifyRunner{
+				cmd:    "sleep 2s",
+				Runner: wr.New("development"),
+				ch:     make(chan bool, 1),
+			}
+
+			builder.runner = mr
+
+			err := builder.Build(def)
+			So(err, ShouldBeNil)
+
+			err = builder.Build(def)
+			So(err, ShouldNotBeNil)
+			So(err, ShouldEqual, ErrEnvironmentBuilding)
 		})
 	})
 }
