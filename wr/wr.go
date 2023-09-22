@@ -45,6 +45,9 @@ func init() { //nolint:gochecknoinits
 	wrTmpl = template.Must(template.New("").Parse(wrTmplStr))
 }
 
+// SingularityBuildInS3WRInput returns wr input that could be piped to `wr add`
+// and that would run a singularity build where the working directory is a fuse
+// mount of the given s3Path.
 func SingularityBuildInS3WRInput(s3Path string) (string, error) {
 	var w strings.Builder
 
@@ -55,14 +58,24 @@ func SingularityBuildInS3WRInput(s3Path string) (string, error) {
 	return w.String(), nil
 }
 
+// Runner lets you Run() a wr add command.
 type Runner struct {
 	deployment string
 }
 
+// New returns a Runner that will use the given wr deployment to wr add jobs
+// during Run().
 func New(deployment string) *Runner {
 	return &Runner{deployment: deployment}
 }
 
+// Run pipes the given wrInput (eg. as produced by
+// SingularityBuildInS3WRInput()) to `wr add` and waits for the job to exit. The
+// memory defaults to 8GB, time to 8hrs, and if the cmd in the input has
+// previously been run, the cmd will be re-run.
+//
+// NB: if the cmd is a duplicate of a currently queued job, this will not
+// generate an error, but just wait until that job completes.
 func (r *Runner) Run(wrInput string) error {
 	cmd := exec.Command("wr", "add", "--deployment", r.deployment, "--sync", //nolint:gosec
 		"--time", "8h", "--memory", "8G", "--rerun")
