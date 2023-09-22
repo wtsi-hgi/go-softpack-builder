@@ -32,6 +32,8 @@ import (
 	"github.com/wtsi-hgi/go-softpack-builder/build"
 )
 
+// Builder interface describes anything that can Build() a singularity image
+// given a build.Definition.
 type Builder interface {
 	Build(*build.Definition) error
 }
