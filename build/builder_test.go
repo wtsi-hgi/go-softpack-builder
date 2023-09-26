@@ -365,11 +365,28 @@ Stage: final
 			So(ms3.downloadSource, ShouldEqual, "groups/hgi/xxhash/0.8.1/singularity.sif")
 			ms3.mu.Unlock()
 
-			_, err = os.Stat(modulePath)
+			info, err := os.Stat(modulePath)
 			So(err, ShouldBeNil)
 
-			_, err = os.Stat(imagePath)
+			perm := info.Mode().Perm()
+			So(perm.String(), ShouldEqual, "-rwxr-xr-x")
+
+			dir := scriptsPath
+			for dir != conf.Module.InstallDir {
+				info, err = os.Stat(dir)
+				So(err, ShouldBeNil)
+				perm = info.Mode().Perm()
+				So(perm&0755, ShouldEqual, 0755)
+
+				dir = filepath.Dir(dir)
+			}
+
+			info, err = os.Stat(imagePath)
 			So(err, ShouldBeNil)
+
+			perm = info.Mode().Perm()
+			So(perm.String(), ShouldEqual, "-rwxr-xr-x")
+
 			So(logWriter.String(), ShouldBeBlank)
 
 			for file, expectedData := range map[string]string{

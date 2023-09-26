@@ -67,29 +67,44 @@ func installModule(installBase string, def *Definition, module,
 
 func makeModuleDirs(installBase string, def *Definition) (string, string, error) {
 	installDir := filepath.Join(installBase, def.EnvironmentPath, def.EnvironmentName)
-
-	if err := os.MkdirAll(installDir, perms); err != nil {
-		return "", "", err
-	}
-
 	scriptsDir := filepath.Join(installDir, def.EnvironmentVersion+scriptsDirSuffix)
 
 	if err := os.MkdirAll(scriptsDir, perms); err != nil {
 		return "", "", err
 	}
 
+	dir := scriptsDir
+
+	for dir != installBase {
+		if err := os.Chmod(dir, perms); err != nil {
+			return "", "", err
+		}
+
+		dir = filepath.Dir(dir)
+	}
+
 	return installDir, scriptsDir, nil
 }
 
-func installFile(data io.Reader, path string) error {
-	f, err := os.OpenFile(path, flags, perms)
+func installFile(data io.Reader, path string) (err error) {
+	var f *os.File
+
+	f, err = os.OpenFile(path, flags, perms)
 	if err != nil {
 		return err
 	}
 
-	defer f.Close()
+	defer func() {
+		if errr := f.Close(); err == nil {
+			err = errr
+		}
+	}()
 
-	_, err = io.Copy(f, data)
+	if _, err = io.Copy(f, data); err != nil {
+		return err
+	}
+
+	err = os.Chmod(path, perms)
 
 	return err
 }
