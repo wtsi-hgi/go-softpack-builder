@@ -47,6 +47,10 @@ type Config struct {
 		URL string `yaml:"url"`
 		Ref string `yaml:"ref"`
 	} `yaml:"customSpackRepo"`
+	Spack struct {
+		BuildImage string `yaml:"buildImage"`
+		FinalImage string `yaml:"finalImage"`
+	} `yaml:"spack"`
 	CoreURL      string `yaml:"coreURL"`
 	ListenURL    string `yaml:"listenURL"`
 	WRDeployment string `yaml:"wrDeployment"`

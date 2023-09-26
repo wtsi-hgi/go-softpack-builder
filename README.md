@@ -73,6 +73,10 @@ customSpackRepo:
   url: "https://github.com/org/spack-repo.git"
   ref: "main"
 
+spack:
+  buildImage: "spack/ubuntu-jammy:v0.20.1"
+  finalImage: "ubuntu:22.04"
+
 coreURL: "http://x.y.z:9837/upload"
 listenURL: "0.0.0.0:2456"
 ```
@@ -93,6 +97,11 @@ Where:
 - customSpackRepo is your own repository of Spack packages containing your own
   custom recipies. It will be used in addition to Spack's build-in repo during
   builds.
+- buildImage is spack's docker image from their docker hub with the desired
+  version (don't use latest if you want reproducability) of spack and desired
+  OS.
+- finalImage is the base image for the OS you want the software spack builds to
+  installed inside (it should be the same OS as buildImage).
 - coreURL is the URL of a running softpack core service, that will be used to
   send build artifacts to so that it can store them in a softpack environements
   git repository and make them visible on the softpack frontend.

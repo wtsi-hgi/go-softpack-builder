@@ -13,5 +13,9 @@ customSpackRepo:
   url: "https://github.com/org/spack"
   ref: "aaaaaaa"
 
+spack:
+  buildImage: "spack/ubuntu-jammy:latest"
+  finalImage: "ubuntu:22.04"
+
 coreURL: "http://x.y.z:9837/graphql"
 listenURL: "localhost:2456"

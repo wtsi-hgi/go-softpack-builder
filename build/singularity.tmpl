@@ -1,5 +1,5 @@
 Bootstrap: docker
-From: spack/ubuntu-jammy:latest
+From: {{ .BuildImage }}
 Stage: build
 
 %files
@@ -51,7 +51,7 @@ EOF
 	done | xargs -L 1 basename | sort | uniq > executables
 
 Bootstrap: docker
-From: ubuntu:22.04
+From: {{ .FinalImage }}
 Stage: final
 
 %files from build
