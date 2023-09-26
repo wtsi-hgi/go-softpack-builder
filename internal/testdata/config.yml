@@ -14,6 +14,7 @@ customSpackRepo:
   ref: "aaaaaaa"
 
 spack:
+  binaryCache: "https://binaries.spack.io/develop"
   buildImage: "spack/ubuntu-jammy:latest"
   finalImage: "ubuntu:22.04"
 

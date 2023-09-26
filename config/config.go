@@ -48,8 +48,9 @@ type Config struct {
 		Ref string `yaml:"ref"`
 	} `yaml:"customSpackRepo"`
 	Spack struct {
-		BuildImage string `yaml:"buildImage"`
-		FinalImage string `yaml:"finalImage"`
+		BinaryCache string `yaml:"binaryCache"`
+		BuildImage  string `yaml:"buildImage"`
+		FinalImage  string `yaml:"finalImage"`
 	} `yaml:"spack"`
 	CoreURL      string `yaml:"coreURL"`
 	ListenURL    string `yaml:"listenURL"`

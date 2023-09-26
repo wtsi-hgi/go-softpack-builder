@@ -102,7 +102,7 @@ func (m *mockS3) OpenFile(source string) (io.ReadCloser, error) {
 	}
 
 	if filepath.Base(source) == spackLock {
-		return io.NopCloser(strings.NewReader(`{"_meta":{"file-type":"spack-lockfile","lockfile-version":5,"specfile-version":4},"spack":{"version":"0.21.0.dev0","type":"git","commit":"dac3b453879439fd733b03d0106cc6fe070f71f6"},"roots":[{"hash":"oibd5a4hphfkgshqiav4fdkvw4hsq4ek","spec":"xxhash arch=None-None-x86_64_v3"}, {"hash":"2ibd5a4hphfkgshqiav4fdkvw4hsq4e2","spec":"r-seurat arch=None-None-x86_64_v3"}],"concrete_specs":{"oibd5a4hphfkgshqiav4fdkvw4hsq4ek":{"name":"xxhash","version":"0.8.1","arch":{"platform":"linux","platform_os":"ubuntu22.04","target":"x86_64_v3"},"compiler":{"name":"gcc","version":"11.4.0"},"namespace":"builtin","parameters":{"build_system":"makefile","cflags":[],"cppflags":[],"cxxflags":[],"fflags":[],"ldflags":[],"ldlibs":[]},"package_hash":"wuj5b2kjnmrzhtjszqovcvgc3q46m6hoehmiccimi5fs7nmsw22a====","hash":"oibd5a4hphfkgshqiav4fdkvw4hsq4ek"},"2ibd5a4hphfkgshqiav4fdkvw4hsq4e2":{"name":"r-seurat","version":"4","arch":{"platform":"linux","platform_os":"ubuntu22.04","target":"x86_64_v3"},"compiler":{"name":"gcc","version":"11.4.0"},"namespace":"builtin","parameters":{"build_system":"makefile","cflags":[],"cppflags":[],"cxxflags":[],"fflags":[],"ldflags":[],"ldlibs":[]},"package_hash":"2uj5b2kjnmrzhtjszqovcvgc3q46m6hoehmiccimi5fs7nmsw222====","hash":"2ibd5a4hphfkgshqiav4fdkvw4hsq4e2"}}}`)), nil //nolint:lll
+		return io.NopCloser(strings.NewReader(`{"_meta":{"file-type":"spack-lockfile","lockfile-version":5,"specfile-version":4},"spack":{"version":"0.21.0.dev0","type":"git","commit":"dac3b453879439fd733b03d0106cc6fe070f71f6"},"roots":[{"hash":"oibd5a4hphfkgshqiav4fdkvw4hsq4ek","spec":"xxhash arch=None-None-x86_64_v3"}, {"hash":"1ibd5a4hphfkgshqiav4fdkvw4hsq4e1","spec":"py-anndata arch=None-None-x86_64_v3"}, {"hash":"2ibd5a4hphfkgshqiav4fdkvw4hsq4e2","spec":"r-seurat arch=None-None-x86_64_v3"}],"concrete_specs":{"oibd5a4hphfkgshqiav4fdkvw4hsq4ek":{"name":"xxhash","version":"0.8.1","arch":{"platform":"linux","platform_os":"ubuntu22.04","target":"x86_64_v3"},"compiler":{"name":"gcc","version":"11.4.0"},"namespace":"builtin","parameters":{"build_system":"makefile","cflags":[],"cppflags":[],"cxxflags":[],"fflags":[],"ldflags":[],"ldlibs":[]},"package_hash":"wuj5b2kjnmrzhtjszqovcvgc3q46m6hoehmiccimi5fs7nmsw22a====","hash":"oibd5a4hphfkgshqiav4fdkvw4hsq4ek"},"2ibd5a4hphfkgshqiav4fdkvw4hsq4e2":{"name":"r-seurat","version":"4","arch":{"platform":"linux","platform_os":"ubuntu22.04","target":"x86_64_v3"},"compiler":{"name":"gcc","version":"11.4.0"},"namespace":"builtin","parameters":{"build_system":"makefile","cflags":[],"cppflags":[],"cxxflags":[],"fflags":[],"ldflags":[],"ldlibs":[]},"package_hash":"2uj5b2kjnmrzhtjszqovcvgc3q46m6hoehmiccimi5fs7nmsw222====","hash":"2ibd5a4hphfkgshqiav4fdkvw4hsq4e2"}, "1ibd5a4hphfkgshqiav4fdkvw4hsq4e1":{"name":"py-anndata","version":"3.14","arch":{"platform":"linux","platform_os":"ubuntu22.04","target":"x86_64_v3"},"compiler":{"name":"gcc","version":"11.4.0"},"namespace":"builtin","parameters":{"build_system":"makefile","cflags":[],"cppflags":[],"cxxflags":[],"fflags":[],"ldflags":[],"ldlibs":[]},"package_hash":"2uj5b2kjnmrzhtjszqovcvgc3q46m6hoehmiccimi5fs7nmsw222====","hash":"1ibd5a4hphfkgshqiav4fdkvw4hsq4e1"}}}`)), nil //nolint:lll
 	}
 
 	return nil, io.EOF
@@ -229,6 +229,7 @@ func TestBuilder(t *testing.T) {
 		conf.CustomSpackRepo.URL = "https://github.com/spack/repo"
 		conf.CustomSpackRepo.Ref = "some_tag"
 		conf.CoreURL = msc.URL
+		conf.Spack.BinaryCache = "https://binaries.spack.io/v0.20.1"
 		conf.Spack.BuildImage = "spack/ubuntu-jammy:v0.20.1"
 		conf.Spack.FinalImage = "ubuntu:22.04"
 
@@ -263,6 +264,7 @@ spack:
   specs:
   - xxhash@0.8.1 arch=None-None-x86_64_v3
   - r-seurat@4 arch=None-None-x86_64_v3
+  - py-anndata@3.14 arch=None-None-x86_64_v3
   view: /opt/view
   concretizer:
     unify: true
@@ -272,7 +274,7 @@ EOF
 
 	# Install all the required software
 	. /opt/spack/share/spack/setup-env.sh
-	spack mirror add develop https://binaries.spack.io/develop
+	spack mirror add spackCache https://binaries.spack.io/v0.20.1
 	spack mirror add s3cache "s3://spack"
 	tmpDir="$(mktemp -d)"
 	git clone "https://github.com/spack/repo" "$tmpDir"
@@ -295,9 +297,14 @@ EOF
 
 	spack env activate .
 	exes="$(find $(echo $PATH | tr ":" "\n" | grep /opt/view/ | tr "\n" " ") -maxdepth 1 -executable -type l | xargs -L 1 readlink)";
-	for pkg in "xxhash" "r-seurat"; do
-		echo "$exes" | grep "/linux-[^/]*/gcc-[^/]*/$pkg-";
-	done | xargs -L 1 basename | sort | uniq > executables
+	{
+		for pkg in "xxhash" "r-seurat" "py-anndata"; do
+			echo "$exes" | grep "/linux-[^/]*/gcc-[^/]*/$pkg-";
+		done | xargs -L 1 basename;
+		echo "R";
+		echo "Rscript";
+		echo "python";
+	} | sort | uniq > executables
 
 Bootstrap: docker
 From: ubuntu:22.04
@@ -323,14 +330,14 @@ Stage: final
 			conf.Module.InstallDir = t.TempDir()
 			conf.Module.WrapperScript = "/path/to/wrapper"
 			conf.Module.LoadPath = moduleLoadPrefix
-			ms3.exes = "xxhsum\nxxh32sum\nxxh64sum\nxxh128sum\n"
+			ms3.exes = "xxhsum\nxxh32sum\nxxh64sum\nxxh128sum\nR\nRscript\npython\n"
 			err := builder.Build(def)
 			So(err, ShouldBeNil)
 
 			<-ms3.ch
 			So(ms3.dest, ShouldEqual, "groups/hgi/xxhash/0.8.1/singularity.def")
 			So(ms3.data, ShouldContainSubstring, "specs:\n  - xxhash@0.8.1 arch=None-None-x86_64_v3\n"+
-				"  - r-seurat@4 arch=None-None-x86_64_v3\n  view")
+				"  - r-seurat@4 arch=None-None-x86_64_v3\n  - py-anndata@3.14 arch=None-None-x86_64_v3\n  view")
 
 			<-mwr.ch
 			So(mwr.cmd, ShouldContainSubstring, "echo doing build in some_path/groups/hgi/xxhash/0.8.1; sudo singularity build")
@@ -341,7 +348,7 @@ Stage: final
 			modulePath := filepath.Join(envPath, def.EnvironmentVersion)
 			scriptsPath := filepath.Join(envPath, def.EnvironmentVersion+scriptsDirSuffix)
 			imagePath := filepath.Join(scriptsPath, imageBasename)
-			expectedExes := []string{"xxhsum", "xxh32sum", "xxh64sum", "xxh128sum"}
+			expectedExes := []string{"python", "R", "Rscript", "xxhsum", "xxh32sum", "xxh64sum", "xxh128sum"}
 
 			expectedFiles := []string{modulePath, scriptsPath, imagePath}
 
@@ -394,6 +401,7 @@ Stage: final
   some help text
 packages:
   - xxhash@0.8.1
+  - py-anndata@3.14
   - r-seurat@4
 `,
 				moduleForCoreBasename:  "module-whatis",
@@ -473,6 +481,10 @@ func getExampleDefinition() *Definition {
 			{
 				Name:    "r-seurat",
 				Version: "4",
+			},
+			{
+				Name:    "py-anndata",
+				Version: "3.14",
 			},
 		},
 	}

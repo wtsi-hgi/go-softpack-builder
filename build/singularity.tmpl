@@ -23,8 +23,8 @@ EOF
 
 	# Install all the required software
 	. /opt/spack/share/spack/setup-env.sh
-	spack mirror add develop https://binaries.spack.io/develop
-	spack mirror add s3cache "{{ .BuildCache }}"
+	spack mirror add spackCache {{ .SpackBinaryCache }}
+	spack mirror add s3cache "{{ .S3BinaryCache }}"
 	tmpDir="$(mktemp -d)"
 	git clone "{{ .RepoURL }}" "$tmpDir"
 	git -C "$tmpDir" checkout "{{ .RepoRef }}"
@@ -46,9 +46,14 @@ EOF
 
 	spack env activate .
 	exes="$(find $(echo $PATH | tr ":" "\n" | grep /opt/view/ | tr "\n" " ") -maxdepth 1 -executable -type l | xargs -L 1 readlink)";
-	for pkg in{{ range .Packages }} "{{ .Name }}"{{ end }}; do
-		echo "$exes" | grep "/linux-[^/]*/gcc-[^/]*/$pkg-";
-	done | xargs -L 1 basename | sort | uniq > executables
+	{
+		for pkg in{{ range .Packages }} "{{ .Name }}"{{ end }}; do
+			echo "$exes" | grep "/linux-[^/]*/gcc-[^/]*/$pkg-";
+		done | xargs -L 1 basename;
+		{{- range .ExtraExes }}
+		echo "{{ . }}";
+		{{- end }}
+	} | sort | uniq > executables
 
 Bootstrap: docker
 From: {{ .FinalImage }}
