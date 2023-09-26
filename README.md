@@ -88,7 +88,9 @@ Where:
 - buildBase is the bucket and optional sub "directory" that builds will occur
   in.
 - installDir is the absolute base path that modules will be installed to
-  following a build.
+  following a build. This directory needs to be accessible by your users.
+  Directories and files that gsb creates within will be world readable and
+  executable.
 - loadPath is the base that users `module load`.
 - dependencies are any module dependencies that need to be loaded because that
   software won't be part of the environments being built. Users will at least
