@@ -36,6 +36,7 @@ import (
 
 // global options.
 var configPath string
+var debug bool
 
 // RootCmd represents the base command when called without any subcommands.
 var RootCmd = &cobra.Command{
@@ -61,6 +62,8 @@ func init() {
 	// global flags
 	RootCmd.PersistentFlags().StringVar(&configPath, "config", "",
 		"path to config file")
+	RootCmd.PersistentFlags().BoolVar(&debug, "debug", false,
+		"turn on debug logging output")
 }
 
 // die is a convenience to log a message at the Error level and exit non zero.

@@ -24,6 +24,7 @@
 package cmd
 
 import (
+	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -35,6 +36,13 @@ import (
 )
 
 func serverCmd(_ *cobra.Command, _ []string) {
+	if debug {
+		h := slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
+			Level: slog.LevelDebug,
+		})
+		slog.SetDefault(slog.New(h))
+	}
+
 	if configPath == "" {
 		home, err := os.UserHomeDir()
 		if err != nil {

@@ -28,9 +28,18 @@ import (
 	"fmt"
 	"net/http"
 	"path"
+	"strings"
 
 	"github.com/wtsi-hgi/go-softpack-builder/build"
 )
+
+type Error string
+
+func (e Error) Error() string {
+	return string(e)
+}
+
+const ErrInvalidEnvPath = Error("invalid environment path")
 
 // Builder interface describes anything that can Build() a singularity image
 // given a build.Definition.
@@ -65,8 +74,21 @@ func New(b Builder) http.Handler {
 		def.Description = req.Model.Description
 		def.Packages = req.Model.Packages
 
+		if err := validateRequest(def); err != nil {
+			http.Error(w, fmt.Sprintf("error validating request: %s", err), http.StatusBadRequest)
+		}
+
 		if err := b.Build(def); err != nil {
 			http.Error(w, fmt.Sprintf("error starting build: %s", err), http.StatusInternalServerError)
 		}
 	})
+}
+
+func validateRequest(def *build.Definition) error {
+	epParts := strings.Split(def.EnvironmentPath, "/")
+	if len(epParts) != 2 && !(epParts[0] == "groups" || epParts[0] == "users") {
+		return ErrInvalidEnvPath
+	}
+
+	return nil
 }

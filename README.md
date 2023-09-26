@@ -73,7 +73,7 @@ customSpackRepo:
   url: "https://github.com/org/spack-repo.git"
   ref: "main"
 
-coreURL: "http://x.y.z:9837/graphql"
+coreURL: "http://x.y.z:9837/upload"
 listenURL: "0.0.0.0:2456"
 ```
 
@@ -118,7 +118,7 @@ url="http://[listenURL]/environments/build";
 
 curl -X POST -H "Content-Type: application/json" --data-binary @- "$url" <<HEREDOC
 {
-	"name": "test-build",
+	"name": "users/user/test-build",
 	"version": "1.0",
 	"model": {
 		"description": "A simple description",
@@ -132,8 +132,8 @@ HEREDOC
 
 This should result in a job running in your wr manager that creates the
 singularity image file and other artifacts in your S3 buildBase. The module
-wrapper for the image will be installed.
+wrapper for the image will be installed to your installDir.
 
-Only the last step when gsb tries to send the artifacts to the core, will fail,
+Only the last step, when gsb tries to send the artifacts to the core, will fail,
 but you'll at least have a usable software installation of the environment that
 can be tested and used.

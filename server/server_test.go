@@ -24,6 +24,7 @@
 package server
 
 import (
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -75,5 +76,22 @@ func TestServer(t *testing.T) {
 				},
 			},
 		})
+
+		resp, err = server.Client().Post(server.URL+"/environments/build", "application/json", //nolint:noctx
+			strings.NewReader(`
+{
+	"name": "myenv",
+	"version": "0.8.1",
+	"model": {
+		"description": "help text",
+		"packages": [{"name": "xxhash", "version": "0.8.1"}]
+	}
+}
+`))
+		So(err, ShouldBeNil)
+		So(resp.StatusCode, ShouldEqual, http.StatusBadRequest)
+		body, err := io.ReadAll(resp.Body)
+		So(err, ShouldBeNil)
+		So(string(body), ShouldEqual, "error validating request: invalid environment path\n")
 	})
 }
