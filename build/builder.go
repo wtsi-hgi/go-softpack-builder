@@ -138,6 +138,8 @@ type templateVars struct {
 	BuildCache string
 	RepoURL    string
 	RepoRef    string
+	BuildImage string
+	FinalImage string
 	Packages   []Package
 }
 
@@ -222,6 +224,8 @@ func (b *Builder) generateSingularityDef(def *Definition) (string, error) {
 		BuildCache: b.config.S3.BinaryCache,
 		RepoURL:    b.config.CustomSpackRepo.URL,
 		RepoRef:    b.config.CustomSpackRepo.Ref,
+		BuildImage: b.config.Spack.BuildImage,
+		FinalImage: b.config.Spack.FinalImage,
 		Packages:   def.Packages,
 	})
 

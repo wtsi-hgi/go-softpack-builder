@@ -229,6 +229,8 @@ func TestBuilder(t *testing.T) {
 		conf.CustomSpackRepo.URL = "https://github.com/spack/repo"
 		conf.CustomSpackRepo.Ref = "some_tag"
 		conf.CoreURL = msc.URL
+		conf.Spack.BuildImage = "spack/ubuntu-jammy:v0.20.1"
+		conf.Spack.FinalImage = "ubuntu:22.04"
 
 		builder := &Builder{
 			config:              &conf,
@@ -245,7 +247,7 @@ func TestBuilder(t *testing.T) {
 			So(err, ShouldBeNil)
 			//nolint:lll
 			So(def, ShouldEqual, `Bootstrap: docker
-From: spack/ubuntu-jammy:latest
+From: spack/ubuntu-jammy:v0.20.1
 Stage: build
 
 %files
