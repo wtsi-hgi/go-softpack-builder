@@ -43,6 +43,20 @@ func serverCmd(_ *cobra.Command, _ []string) {
 		slog.SetDefault(slog.New(h))
 	}
 
+	conf := getConfig()
+
+	b, err := build.New(conf)
+	if err != nil {
+		die("could not create a builder: %s", err)
+	}
+
+	err = http.ListenAndServe(conf.ListenURL, server.New(b)) //nolint:gosec
+	if err != nil {
+		die("could not start server: %s", err)
+	}
+}
+
+func getConfig() *config.Config {
 	if configPath == "" {
 		home, err := os.UserHomeDir()
 		if err != nil {
@@ -64,13 +78,5 @@ func serverCmd(_ *cobra.Command, _ []string) {
 		die("could not parse config file: %s", err)
 	}
 
-	b, err := build.New(conf)
-	if err != nil {
-		die("could not create a builder: %s", err)
-	}
-
-	err = http.ListenAndServe(conf.ListenURL, server.New(b)) //nolint:gosec
-	if err != nil {
-		die("could not start server: %s", err)
-	}
+	return conf
 }

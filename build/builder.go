@@ -431,6 +431,7 @@ func (b *Builder) addArtifactsToRepo(artifacts map[string]io.Reader, envPath str
 
 	_, err = http.DefaultClient.Do(req)
 	slog.Debug("addArtifactsToRepo", "url", b.config.CoreURL+"?"+url.QueryEscape(envPath), "err", err)
+
 	if err != nil {
 		return err
 	}
