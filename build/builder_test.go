@@ -284,7 +284,7 @@ EOF
 	spack config add "config:install_tree:padded_length:128"
 	spack -e . concretize
 	spack -e . install
-	spack -e . buildcache push --rebuild-index -f s3cache
+	spack -e . buildcache push -a --rebuild-index -f s3cache
 	spack gc -y
 	spack env activate --sh -d . >> /opt/spack-environment/environment_modifications.sh
 
@@ -399,6 +399,15 @@ Stage: final
 			for file, expectedData := range map[string]string{
 				softpackYaml: `description: |
   some help text
+
+  The following executables are added to your PATH:
+    - xxhsum
+    - xxh32sum
+    - xxh64sum
+    - xxh128sum
+    - R
+    - Rscript
+    - python
 packages:
   - xxhash@0.8.1
   - py-anndata@3.14

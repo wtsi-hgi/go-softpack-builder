@@ -1,4 +1,13 @@
-description: |{{ range .Description }}
-  {{ . }}{{ end }}
-packages:{{ range .Packages }}
-  - {{ .Name }}@{{ .Version }}{{ end }}
+description: |
+{{- range .Description }}
+  {{ . }}
+{{- end }}
+
+  The following executables are added to your PATH:
+{{- range .Exes }}
+    - {{ . }}
+{{- end }}
+packages:
+{{- range .Packages }}
+  - {{ .Name }}@{{ .Version }}
+{{- end }}

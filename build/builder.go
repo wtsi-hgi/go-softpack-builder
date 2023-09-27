@@ -299,11 +299,11 @@ func (b *Builder) asyncBuild(def *Definition, wrInput, s3Path, singDef string) e
 
 	moduleFileData := def.ToModule(b.config.Module.InstallDir, b.config.Module.Dependencies, exes)
 
-	if err = b.prepareAndInstallArtifacts(def, s3Path, imagePath, moduleFileData, exes); err != nil {
+	if err = b.prepareAndInstallArtifacts(def, imagePath, moduleFileData, exes); err != nil {
 		return err
 	}
 
-	return b.prepareArtifactsFromS3AndSendToCore(def, s3Path, imagePath, moduleFileData, singDef)
+	return b.prepareArtifactsFromS3AndSendToCore(def, s3Path, imagePath, moduleFileData, singDef, exes)
 }
 
 func (b *Builder) addLogToRepo(s3Path, environmentPath string) {
@@ -335,7 +335,7 @@ func (b *Builder) getExes(s3Path string) ([]string, error) {
 	return strings.Split(strings.TrimSpace(string(buf)), "\n"), nil
 }
 
-func (b *Builder) prepareAndInstallArtifacts(def *Definition, s3Path, imagePath,
+func (b *Builder) prepareAndInstallArtifacts(def *Definition, imagePath,
 	moduleFileData string, exes []string) error {
 	imageFile, err := os.Open(imagePath)
 	if err != nil {
@@ -348,7 +348,7 @@ func (b *Builder) prepareAndInstallArtifacts(def *Definition, s3Path, imagePath,
 }
 
 func (b *Builder) prepareArtifactsFromS3AndSendToCore(def *Definition, s3Path,
-	imagePath, moduleFileData, singDef string) error {
+	imagePath, moduleFileData, singDef string, exes []string) error {
 	logData, lockData, imageData, err := b.getArtifactDataFromS3(s3Path, imagePath)
 	if err != nil {
 		return err
@@ -356,7 +356,7 @@ func (b *Builder) prepareArtifactsFromS3AndSendToCore(def *Definition, s3Path,
 
 	defer imageData.Close()
 
-	concreteSpackYAMLFile, err := SpackLockToSoftPackYML(lockData, def.Description)
+	concreteSpackYAMLFile, err := SpackLockToSoftPackYML(lockData, def.Description, exes)
 	if err != nil {
 		return err
 	}
@@ -410,7 +410,13 @@ type SpackLock struct {
 	ConcreteSpecs map[string]ConcreteSpec `json:"concrete_specs"`
 }
 
-func SpackLockToSoftPackYML(data []byte, desc string) (io.Reader, error) {
+type softpackTemplateVars struct {
+	Description []string
+	Packages    []ConcreteSpec
+	Exes        []string
+}
+
+func SpackLockToSoftPackYML(data []byte, desc string, exes []string) (io.Reader, error) {
 	var sl SpackLock
 
 	if err := json.Unmarshal(data, &sl); err != nil {
@@ -430,12 +436,10 @@ func SpackLockToSoftPackYML(data []byte, desc string) (io.Reader, error) {
 
 	var sb strings.Builder
 
-	if err := softpackTmpl.Execute(&sb, struct {
-		Description []string
-		Packages    []ConcreteSpec
-	}{
+	if err := softpackTmpl.Execute(&sb, softpackTemplateVars{
 		Description: strings.Split(desc, "\n"),
 		Packages:    concreteSpecs,
+		Exes:        exes,
 	}); err != nil {
 		return nil, err
 	}
