@@ -46,9 +46,9 @@ const ErrMock = Error("Mock error")
 const moduleLoadPrefix = "HGI/softpack"
 
 type mockS3 struct {
-	ch             chan struct{}
 	data           string
-	dest           string
+	def            string
+	softpackYML    string
 	downloadSource string
 	fail           bool
 	exes           string
@@ -56,8 +56,6 @@ type mockS3 struct {
 }
 
 func (m *mockS3) UploadData(data io.Reader, dest string) error {
-	defer close(m.ch)
-
 	if m.fail {
 		return ErrMock
 	}
@@ -67,8 +65,12 @@ func (m *mockS3) UploadData(data io.Reader, dest string) error {
 		return err
 	}
 
-	m.data = string(buff)
-	m.dest = dest
+	if strings.HasSuffix(dest, ".def") {
+		m.data = string(buff)
+		m.def = dest
+	} else if strings.HasSuffix(dest, ".yml") {
+		m.softpackYML = string(buff)
+	}
 
 	return nil
 }
@@ -218,7 +220,7 @@ func (c *concurrentStringBuilder) String() string {
 
 func TestBuilder(t *testing.T) {
 	Convey("Given binary cache and spack repo details and a Definition", t, func() {
-		ms3 := &mockS3{ch: make(chan struct{})}
+		ms3 := &mockS3{}
 		mwr := &mockWR{ch: make(chan struct{})}
 		mc := &mockCore{files: make(map[string]string)}
 		msc := httptest.NewServer(mc)
@@ -334,8 +336,7 @@ Stage: final
 			err := builder.Build(def)
 			So(err, ShouldBeNil)
 
-			<-ms3.ch
-			So(ms3.dest, ShouldEqual, "groups/hgi/xxhash/0.8.1/singularity.def")
+			So(ms3.def, ShouldEqual, "groups/hgi/xxhash/0.8.1/singularity.def")
 			So(ms3.data, ShouldContainSubstring, "specs:\n  - xxhash@0.8.1 arch=None-None-x86_64_v3\n"+
 				"  - r-seurat@4 arch=None-None-x86_64_v3\n  - py-anndata@3.14 arch=None-None-x86_64_v3\n  view")
 
@@ -396,8 +397,7 @@ Stage: final
 
 			So(logWriter.String(), ShouldBeBlank)
 
-			for file, expectedData := range map[string]string{
-				softpackYaml: `description: |
+			expectedSoftpackYaml := `description: |
   some help text
 
   The following executables are added to your PATH:
@@ -412,7 +412,10 @@ packages:
   - xxhash@0.8.1
   - py-anndata@3.14
   - r-seurat@4
-`,
+`
+
+			for file, expectedData := range map[string]string{
+				softpackYaml:           expectedSoftpackYaml,
 				moduleForCoreBasename:  "module-whatis",
 				singularityDefBasename: "specs:\n  - xxhash@0.8.1 arch=None-None-x86_64_v3",
 				spackLock:              `"concrete_specs":`,
@@ -424,6 +427,8 @@ packages:
 				So(ok, ShouldBeTrue)
 				So(data, ShouldContainSubstring, expectedData)
 			}
+
+			So(ms3.softpackYML, ShouldEqual, expectedSoftpackYaml)
 		})
 
 		Convey("Build returns an error if the upload fails", func() {
