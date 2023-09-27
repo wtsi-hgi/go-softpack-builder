@@ -74,12 +74,44 @@ func (e Error) Error() string { return string(e) }
 const (
 	ErrInvalidJSON         = Error("invalid spack lock JSON")
 	ErrEnvironmentBuilding = Error("build already running for environment")
+
+	ErrInvalidEnvPath = Error("invalid environment path")
+	ErrInvalidVersion = Error("environment version required")
+	ErrNoPackages     = Error("packages required")
+	ErrNoPackageName  = Error("package names required")
 )
 
 // Package describes the name and optional version of a spack package.
 type Package struct {
 	Name    string
 	Version string
+}
+
+// Validate returns an error if Name isn't set.
+func (p *Package) Validate() error {
+	if p.Name == "" {
+		return ErrNoPackageName
+	}
+
+	return nil
+}
+
+type Packages []Package
+
+// Validate returns an error if p is zero length, or any of its Packages are
+// invalid.
+func (p Packages) Validate() error {
+	if len(p) == 0 {
+		return ErrNoPackages
+	}
+
+	for _, pkg := range p {
+		if pkg.Name == "" {
+			return ErrNoPackageName
+		}
+	}
+
+	return nil
 }
 
 // Definition describes the environment a user wanted to create, which
@@ -92,7 +124,7 @@ type Definition struct {
 	EnvironmentName    string
 	EnvironmentVersion string
 	Description        string
-	Packages           []Package
+	Packages           Packages
 }
 
 // FullEnvironmentPath returns the complete environment path: the location under
@@ -128,6 +160,21 @@ func (d *Definition) Interpreters() []string {
 	}
 
 	return interpreters
+}
+
+// Validate returns an error if the Path is invalid, if Version isn't set, if
+// there are no packages defined, or if any package has no name.
+func (d *Definition) Validate() error {
+	epParts := strings.Split(d.EnvironmentPath, "/")
+	if len(epParts) != 2 && !(epParts[0] == "groups" || epParts[0] == "users") {
+		return ErrInvalidEnvPath
+	}
+
+	if d.EnvironmentVersion == "" {
+		return ErrInvalidVersion
+	}
+
+	return d.Packages.Validate()
 }
 
 // Builder lets you do builds given config, S3 and a wr runner.

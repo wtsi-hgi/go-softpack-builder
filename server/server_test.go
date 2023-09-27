@@ -45,7 +45,7 @@ func (m *mockBuilder) Build(def *build.Definition) error {
 }
 
 func TestServer(t *testing.T) {
-	Convey("Core posts result in a Definition being sent to Build()", t, func() {
+	Convey("Posts to core result in a Definition being sent to Build()", t, func() {
 		mb := new(mockBuilder)
 
 		handler := New(mb)
@@ -77,21 +77,67 @@ func TestServer(t *testing.T) {
 			},
 		})
 
-		resp, err = server.Client().Post(server.URL+"/environments/build", "application/json", //nolint:noctx
-			strings.NewReader(`
-{
-	"name": "myenv",
-	"version": "0.8.1",
-	"model": {
-		"description": "help text",
-		"packages": [{"name": "xxhash", "version": "0.8.1"}]
-	}
-}
-`))
-		So(err, ShouldBeNil)
-		So(resp.StatusCode, ShouldEqual, http.StatusBadRequest)
-		body, err := io.ReadAll(resp.Body)
-		So(err, ShouldBeNil)
-		So(string(body), ShouldEqual, "error validating request: invalid environment path\n")
+		Convey("Unless the request is invalid", func() {
+			for _, test := range [...]struct {
+				InputJSON   string
+				OutputError string
+			}{
+				{
+					InputJSON: `
+						{
+							"name": "myenv",
+							"version": "0.8.1",
+							"model": {
+								"description": "help text",
+								"packages": [{"name": "xxhash", "version": "0.8.1"}]
+							}
+						}`,
+					OutputError: "error validating request: invalid environment path\n",
+				},
+				{
+					InputJSON: `
+					{
+						"name": "groups/hgi/myenv",
+						"model": {
+							"description": "help text",
+							"packages": [{"name": "xxhash", "version": "0.8.1"}]
+						}
+					}`,
+					OutputError: "error validating request: environment version required\n",
+				},
+				{
+					InputJSON: `
+					{
+						"name": "groups/hgi/myenv",
+						"version": "0.8.1",
+						"model": {
+							"description": "help text"
+						}
+					}`,
+					OutputError: "error validating request: packages required\n",
+				},
+				{
+					InputJSON: `
+					{
+						"name": "groups/hgi/myenv",
+						"version": "0.8.1",
+						"model": {
+							"description": "help text",
+							"packages": [{"version": "0.8.1"}]
+						}
+					}`,
+					OutputError: "error validating request: package names required\n",
+				},
+			} {
+				resp, err = server.Client().Post(server.URL+"/environments/build", "application/json", //nolint:noctx
+					strings.NewReader(test.InputJSON))
+
+				So(err, ShouldBeNil)
+				So(resp.StatusCode, ShouldEqual, http.StatusBadRequest)
+				body, erra := io.ReadAll(resp.Body)
+				So(erra, ShouldBeNil)
+				So(string(body), ShouldEqual, test.OutputError)
+			}
+		})
 	})
 }
