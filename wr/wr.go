@@ -78,7 +78,7 @@ func New(deployment string) *Runner {
 // generate an error, but just wait until that job completes.
 func (r *Runner) Run(wrInput string) error {
 	cmd := exec.Command("wr", "add", "--deployment", r.deployment, "--sync", //nolint:gosec
-		"--time", "8h", "--memory", "8G", "--rerun")
+		"--time", "8h", "--memory", "43G", "-o", "2", "--rerun")
 	cmd.Stdin = strings.NewReader(wrInput)
 
 	var std bytes.Buffer
