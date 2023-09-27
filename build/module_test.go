@@ -46,7 +46,7 @@ proc ModulesHelp { } {
 
 module-whatis "Name: %s"
 module-whatis "Version: %s"
-module-whatis "Packages: xxhash@0.8.1, r-seurat@4"
+module-whatis "Packages: xxhash@0.8.1, r-seurat@4, py-anndata@3.14"
 
 module load %s
 
