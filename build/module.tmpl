@@ -1,7 +1,14 @@
 #%Module
 
 proc ModulesHelp { } {
-	puts stderr "{{ .Description }}"
+	{{- range .Description }}
+	puts stderr "{{ . }}"
+	{{- end }}
+	puts stderr ""
+	puts stderr "The following executables are added to your PATH:"
+	{{- range .Exes }}
+	puts stderr "  - {{ . }}"
+	{{- end }}
 }
 
 module-whatis "Name: {{ .EnvironmentName }}"

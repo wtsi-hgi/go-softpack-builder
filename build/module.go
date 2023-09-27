@@ -47,17 +47,21 @@ func init() { //nolint:gochecknoinits
 // prepend a PATH for the exe wrapper scripts that will be at the installed
 // location of the module. Any supplied module dependencies will be module
 // loaded.
-func (d *Definition) ToModule(installDir string, deps []string) string {
+func (d *Definition) ToModule(installDir string, deps, exes []string) string {
 	var sb strings.Builder
 
 	moduleTmpl.Execute(&sb, struct { //nolint:errcheck
 		InstallDir   string
 		Dependencies []string
 		*Definition
+		Description []string
+		Exes        []string
 	}{
 		InstallDir:   installDir,
 		Dependencies: deps,
 		Definition:   d,
+		Description:  strings.Split(d.Description, "\n"),
+		Exes:         exes,
 	})
 
 	return sb.String()

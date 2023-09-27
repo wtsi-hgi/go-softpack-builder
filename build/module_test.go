@@ -37,11 +37,22 @@ func TestModule(t *testing.T) {
 		installDir := "/software/modules/HGI/softpack"
 
 		def := getExampleDefinition()
-		moduleFileData := def.ToModule(installDir, []string{moduleDependencies})
+		moduleFileData := def.ToModule(installDir,
+			[]string{moduleDependencies},
+			[]string{"xxhsum", "xxh32sum", "xxh64sum", "xxh128sum", "R", "Rscript", "python"})
 		So(moduleFileData, ShouldEqual, fmt.Sprintf(`#%%Module
 
 proc ModulesHelp { } {
 	puts stderr "%s"
+	puts stderr ""
+	puts stderr "The following executables are added to your PATH:"
+	puts stderr "  - xxhsum"
+	puts stderr "  - xxh32sum"
+	puts stderr "  - xxh64sum"
+	puts stderr "  - xxh128sum"
+	puts stderr "  - R"
+	puts stderr "  - Rscript"
+	puts stderr "  - python"
 }
 
 module-whatis "Name: %s"

@@ -292,9 +292,14 @@ func (b *Builder) asyncBuild(def *Definition, wrInput, s3Path, singDef string) e
 		return err
 	}
 
-	moduleFileData := def.ToModule(b.config.Module.InstallDir, b.config.Module.Dependencies)
+	exes, err := b.getExes(s3Path)
+	if err != nil {
+		return err
+	}
 
-	if err = b.prepareAndInstallArtifacts(def, s3Path, imagePath, moduleFileData); err != nil {
+	moduleFileData := def.ToModule(b.config.Module.InstallDir, b.config.Module.Dependencies, exes)
+
+	if err = b.prepareAndInstallArtifacts(def, s3Path, imagePath, moduleFileData, exes); err != nil {
 		return err
 	}
 
@@ -305,6 +310,8 @@ func (b *Builder) addLogToRepo(s3Path, environmentPath string) {
 	log, err := b.s3.OpenFile(filepath.Join(s3Path, builderOut))
 	if err != nil {
 		slog.Error("error getting build log file", "err", err)
+
+		return
 	}
 
 	if err := b.addArtifactsToRepo(map[string]io.Reader{
@@ -314,17 +321,22 @@ func (b *Builder) addLogToRepo(s3Path, environmentPath string) {
 	}
 }
 
-func (b *Builder) prepareAndInstallArtifacts(def *Definition, s3Path, imagePath, moduleFileData string) error {
+func (b *Builder) getExes(s3Path string) ([]string, error) {
 	exeData, err := b.s3.OpenFile(filepath.Join(s3Path, exesBasename))
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	exes, err := executablesFileToExes(exeData)
+	buf, err := io.ReadAll(exeData)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
+	return strings.Split(strings.TrimSpace(string(buf)), "\n"), nil
+}
+
+func (b *Builder) prepareAndInstallArtifacts(def *Definition, s3Path, imagePath,
+	moduleFileData string, exes []string) error {
 	imageFile, err := os.Open(imagePath)
 	if err != nil {
 		return err
@@ -333,15 +345,6 @@ func (b *Builder) prepareAndInstallArtifacts(def *Definition, s3Path, imagePath,
 
 	return installModule(b.config.Module.InstallDir, def,
 		strings.NewReader(moduleFileData), imageFile, exes, b.config.Module.WrapperScript)
-}
-
-func executablesFileToExes(data io.Reader) ([]string, error) {
-	buf, err := io.ReadAll(data)
-	if err != nil {
-		return nil, err
-	}
-
-	return strings.Split(strings.TrimSpace(string(buf)), "\n"), nil
 }
 
 func (b *Builder) prepareArtifactsFromS3AndSendToCore(def *Definition, s3Path,
