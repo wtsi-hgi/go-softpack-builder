@@ -350,7 +350,7 @@ func (b *Builder) asyncBuild(def *Definition, wrInput, s3Path, singDef string) e
 		return err
 	}
 
-	return b.prepareArtifactsFromS3AndSendToCore(def, s3Path, imagePath, moduleFileData, singDef, exes)
+	return b.prepareArtifactsFromS3AndSendToCoreAndS3(def, s3Path, imagePath, moduleFileData, singDef, exes)
 }
 
 func (b *Builder) addLogToRepo(s3Path, environmentPath string) {
@@ -394,7 +394,7 @@ func (b *Builder) prepareAndInstallArtifacts(def *Definition, imagePath,
 		strings.NewReader(moduleFileData), imageFile, exes, b.config.Module.WrapperScript)
 }
 
-func (b *Builder) prepareArtifactsFromS3AndSendToCore(def *Definition, s3Path,
+func (b *Builder) prepareArtifactsFromS3AndSendToCoreAndS3(def *Definition, s3Path,
 	imagePath, moduleFileData, singDef string, exes []string) error {
 	logData, lockData, imageData, err := b.getArtifactDataFromS3(s3Path, imagePath)
 	if err != nil {
@@ -408,11 +408,15 @@ func (b *Builder) prepareArtifactsFromS3AndSendToCore(def *Definition, s3Path,
 		return err
 	}
 
+	if err = b.s3.UploadData(strings.NewReader(concreteSpackYAMLFile), filepath.Join(s3Path, softpackYaml)); err != nil {
+		return err
+	}
+
 	return b.addArtifactsToRepo(
 		map[string]io.Reader{
 			imageBasename:          imageData,
 			spackLock:              bytes.NewReader(lockData),
-			softpackYaml:           concreteSpackYAMLFile,
+			softpackYaml:           strings.NewReader(concreteSpackYAMLFile),
 			singularityDefBasename: strings.NewReader(singDef),
 			builderOut:             logData,
 			moduleForCoreBasename:  strings.NewReader(moduleFileData),
@@ -463,11 +467,11 @@ type softpackTemplateVars struct {
 	Exes        []string
 }
 
-func SpackLockToSoftPackYML(data []byte, desc string, exes []string) (io.Reader, error) {
+func SpackLockToSoftPackYML(data []byte, desc string, exes []string) (string, error) {
 	var sl SpackLock
 
 	if err := json.Unmarshal(data, &sl); err != nil {
-		return nil, err
+		return "", err
 	}
 
 	concreteSpecs := make([]ConcreteSpec, len(sl.Roots))
@@ -475,7 +479,7 @@ func SpackLockToSoftPackYML(data []byte, desc string, exes []string) (io.Reader,
 	for i, root := range sl.Roots {
 		concrete, ok := sl.ConcreteSpecs[root.Hash]
 		if !ok {
-			return nil, ErrInvalidJSON
+			return "", ErrInvalidJSON
 		}
 
 		concreteSpecs[i] = concrete
@@ -488,10 +492,10 @@ func SpackLockToSoftPackYML(data []byte, desc string, exes []string) (io.Reader,
 		Packages:    concreteSpecs,
 		Exes:        exes,
 	}); err != nil {
-		return nil, err
+		return "", err
 	}
 
-	return strings.NewReader(sb.String()), nil
+	return sb.String(), nil
 }
 
 func (b *Builder) addArtifactsToRepo(artifacts map[string]io.Reader, envPath string) error { //nolint:misspell
