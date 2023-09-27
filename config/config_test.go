@@ -46,6 +46,7 @@ func TestConfig(t *testing.T) {
 		So(config.Module.Dependencies, ShouldResemble, []string{"/software/modules/ISG/singularity/3.10.0"})
 		So(config.CustomSpackRepo.URL, ShouldEqual, "https://github.com/org/spack")
 		So(config.CustomSpackRepo.Ref, ShouldEqual, "aaaaaaa")
+		So(config.Spack.BinaryCache, ShouldEqual, "https://binaries.spack.io/develop")
 		So(config.Spack.BuildImage, ShouldEqual, "spack/ubuntu-jammy:latest")
 		So(config.Spack.FinalImage, ShouldEqual, "ubuntu:22.04")
 		So(config.CoreURL, ShouldEqual, "http://x.y.z:9837/graphql")

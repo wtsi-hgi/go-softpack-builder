@@ -74,6 +74,7 @@ customSpackRepo:
   ref: "main"
 
 spack:
+  binaryCache: "https://binaries.spack.io/v0.20.1"
   buildImage: "spack/ubuntu-jammy:v0.20.1"
   finalImage: "ubuntu:22.04"
 
@@ -83,7 +84,7 @@ listenURL: "0.0.0.0:2456"
 
 Where:
 
-- binaryCache is the name of your S3 bucket that will be used as a Spack
+- s3.binaryCache is the name of your S3 bucket that will be used as a Spack
   binary cache and has the gpg files copied to it.
 - buildBase is the bucket and optional sub "directory" that builds will occur
   in.
@@ -99,6 +100,9 @@ Where:
 - customSpackRepo is your own repository of Spack packages containing your own
   custom recipies. It will be used in addition to Spack's build-in repo during
   builds.
+- spack.binaryCache is the URL of spack's binary cache. The version should match
+  the spack version in your buildImage. You can find the URLs via
+  https://cache.spack.io.
 - buildImage is spack's docker image from their docker hub with the desired
   version (don't use latest if you want reproducability) of spack and desired
   OS.
