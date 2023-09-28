@@ -217,6 +217,7 @@ func TestBuilder(t *testing.T) {
 		conf.Spack.BinaryCache = "https://binaries.spack.io/v0.20.1"
 		conf.Spack.BuildImage = "spack/ubuntu-jammy:v0.20.1"
 		conf.Spack.FinalImage = "ubuntu:22.04"
+		conf.Spack.ProcessorTarget = "x86_64_v4"
 
 		builder := &Builder{
 			config:              &conf,
@@ -247,9 +248,9 @@ Stage: build
 spack:
   # add package specs to the specs list
   specs:
-  - xxhash@0.8.1 arch=None-None-x86_64_v3
-  - r-seurat@4 arch=None-None-x86_64_v3
-  - py-anndata@3.14 arch=None-None-x86_64_v3
+  - xxhash@0.8.1 arch=None-None-x86_64_v4
+  - r-seurat@4 arch=None-None-x86_64_v4
+  - py-anndata@3.14 arch=None-None-x86_64_v4
   view: /opt/view
   concretizer:
     unify: true
@@ -316,13 +317,14 @@ Stage: final
 			conf.Module.ScriptsInstallDir = t.TempDir()
 			conf.Module.WrapperScript = "/path/to/wrapper"
 			conf.Module.LoadPath = moduleLoadPrefix
+			conf.Spack.ProcessorTarget = "x86_64_v4"
 			ms3.exes = "xxhsum\nxxh32sum\nxxh64sum\nxxh128sum\nR\nRscript\npython\n"
 			err := builder.Build(def)
 			So(err, ShouldBeNil)
 
 			So(ms3.def, ShouldEqual, "groups/hgi/xxhash/0.8.1/singularity.def")
-			So(ms3.data, ShouldContainSubstring, "specs:\n  - xxhash@0.8.1 arch=None-None-x86_64_v3\n"+
-				"  - r-seurat@4 arch=None-None-x86_64_v3\n  - py-anndata@3.14 arch=None-None-x86_64_v3\n  view")
+			So(ms3.data, ShouldContainSubstring, "specs:\n  - xxhash@0.8.1 arch=None-None-x86_64_v4\n"+
+				"  - r-seurat@4 arch=None-None-x86_64_v4\n  - py-anndata@3.14 arch=None-None-x86_64_v4\n  view")
 
 			<-mwr.ch
 			So(mwr.cmd, ShouldContainSubstring, "echo doing build in some_path/groups/hgi/xxhash/0.8.1; sudo singularity build")
@@ -412,13 +414,13 @@ packages:
 			for file, expectedData := range map[string]string{
 				softpackYaml:           expectedSoftpackYaml,
 				moduleForCoreBasename:  "module-whatis",
-				singularityDefBasename: "specs:\n  - xxhash@0.8.1 arch=None-None-x86_64_v3",
+				singularityDefBasename: "specs:\n  - xxhash@0.8.1 arch=None-None-x86_64_v4",
 				spackLock:              `"concrete_specs":`,
 				builderOut:             "output",
 				usageBasename:          "module load " + moduleLoadPrefix + "/groups/hgi/xxhash/0.8.1",
 			} {
-				data, ok := mc.getFile("groups/hgi/xxhash-0.8.1/" + file)
-				So(ok, ShouldBeTrue)
+				data, okg := mc.getFile("groups/hgi/xxhash-0.8.1/" + file)
+				So(okg, ShouldBeTrue)
 				So(data, ShouldContainSubstring, expectedData)
 			}
 

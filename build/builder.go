@@ -212,6 +212,7 @@ type templateVars struct {
 	RepoURL          string
 	RepoRef          string
 	SpackBinaryCache string
+	ProcessorTarget  string
 	BuildImage       string
 	FinalImage       string
 	ExtraExes        []string
@@ -300,6 +301,7 @@ func (b *Builder) generateSingularityDef(def *Definition) (string, error) {
 		RepoURL:          b.config.CustomSpackRepo.URL,
 		RepoRef:          b.config.CustomSpackRepo.Ref,
 		SpackBinaryCache: b.config.Spack.BinaryCache,
+		ProcessorTarget:  b.config.Spack.ProcessorTarget,
 		BuildImage:       b.config.Spack.BuildImage,
 		FinalImage:       b.config.Spack.FinalImage,
 		ExtraExes:        def.Interpreters(),

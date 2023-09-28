@@ -12,8 +12,8 @@ Stage: build
 	cat << EOF > spack.yaml
 spack:
   # add package specs to the specs list
-  specs:{{ range .Packages }}
-  - {{ .Name }}{{ if ne .Version "" }}@{{ .Version }}{{ end }} arch=None-None-x86_64_v3{{ end }}
+  specs:{{ $target := .ProcessorTarget }}{{ range .Packages }}
+  - {{ .Name }}{{ if ne .Version "" }}@{{ .Version }}{{ end }}{{ if ne $target "" }} arch=None-None-{{ $target }}{{ end }}{{ end }}
   view: /opt/view
   concretizer:
     unify: true

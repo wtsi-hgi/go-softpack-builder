@@ -78,6 +78,7 @@ spack:
   binaryCache: "https://binaries.spack.io/v0.20.1"
   buildImage: "spack/ubuntu-jammy:v0.20.1"
   finalImage: "ubuntu:22.04"
+  processorTarget: "x86_64_v3"
 
 coreURL: "http://x.y.z:9837/upload"
 listenURL: "0.0.0.0:2456"
@@ -113,6 +114,8 @@ Where:
   OS.
 - finalImage is the base image for the OS you want the software spack builds to
   installed inside (it should be the same OS as buildImage).
+- processorTarget should match the lowest common denominator CPU for the
+  machines where builds will be used. For example, x86_64_v3.
 - coreURL is the URL of a running softpack core service, that will be used to
   send build artifacts to so that it can store them in a softpack environements
   git repository and make them visible on the softpack frontend.
