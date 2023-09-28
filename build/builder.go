@@ -390,12 +390,13 @@ func (b *Builder) prepareArtifactsFromS3AndSendToCoreAndS3(def *Definition, s3Pa
 		return err
 	}
 
-	concreteSpackYAMLFile, err := SpackLockToSoftPackYML(lockData, def.Description, exes)
+	concreteSpackYAMLFile, err := b.generateAndUploadSpackYAML(lockData, def.Description, exes, s3Path)
 	if err != nil {
 		return err
 	}
 
-	if err = b.s3.UploadData(strings.NewReader(concreteSpackYAMLFile), filepath.Join(s3Path, softpackYaml)); err != nil {
+	readme, err := b.generateAndUploadUsageFile(def, s3Path)
+	if err != nil {
 		return err
 	}
 
@@ -406,7 +407,7 @@ func (b *Builder) prepareArtifactsFromS3AndSendToCoreAndS3(def *Definition, s3Pa
 			singularityDefBasename: strings.NewReader(singDef),
 			builderOut:             logData,
 			moduleForCoreBasename:  strings.NewReader(moduleFileData),
-			usageBasename:          strings.NewReader(def.ModuleUsage(b.config.Module.LoadPath)),
+			usageBasename:          strings.NewReader(readme),
 		},
 		def.FullEnvironmentPath(),
 	)
@@ -431,6 +432,21 @@ func (b *Builder) getArtifactDataFromS3(s3Path string) (io.Reader, []byte, error
 	return logData, lockData, nil
 }
 
+func (b *Builder) generateAndUploadSpackYAML(lockData []byte, description string,
+	exes []string, s3Path string) (string, error) {
+	concreteSpackYAMLFile, err := SpackLockToSoftPackYML(lockData, description, exes)
+	if err != nil {
+		return "", err
+	}
+
+	if err = b.s3.UploadData(strings.NewReader(concreteSpackYAMLFile),
+		filepath.Join(s3Path, softpackYaml)); err != nil {
+		return "", err
+	}
+
+	return concreteSpackYAMLFile, nil
+}
+
 type ConcreteSpec struct {
 	Name, Version string
 }
@@ -448,10 +464,26 @@ type softpackTemplateVars struct {
 	Exes        []string
 }
 
-func SpackLockToSoftPackYML(data []byte, desc string, exes []string) (string, error) {
+// SpackLockToSoftPackYML uses the given spackLockData to generate a
+// disambiguated softpack.yml file.
+//
+// The format of the file is as follows:
+// description: |
+//
+//	$desc
+//	The following executables are added to your PATH:
+//	  - supplied_executable_1
+//	  - supplied_executable_2
+//	  - ...
+//
+// packages:
+//   - supplied_package_1@v1
+//   - supplied_package_2@v1.1
+//   - ...
+func SpackLockToSoftPackYML(spackLockData []byte, desc string, exes []string) (string, error) {
 	var sl SpackLock
 
-	if err := json.Unmarshal(data, &sl); err != nil {
+	if err := json.Unmarshal(spackLockData, &sl); err != nil {
 		return "", err
 	}
 
@@ -477,6 +509,16 @@ func SpackLockToSoftPackYML(data []byte, desc string, exes []string) (string, er
 	}
 
 	return sb.String(), nil
+}
+
+func (b *Builder) generateAndUploadUsageFile(def *Definition, s3Path string) (string, error) {
+	readme := def.ModuleUsage(b.config.Module.LoadPath)
+
+	if err := b.s3.UploadData(strings.NewReader(readme), filepath.Join(s3Path, usageBasename)); err != nil {
+		return "", err
+	}
+
+	return readme, nil
 }
 
 func (b *Builder) addArtifactsToRepo(artifacts map[string]io.Reader, envPath string) error { //nolint:misspell
