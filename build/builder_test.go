@@ -49,6 +49,7 @@ type mockS3 struct {
 	data        string
 	def         string
 	softpackYML string
+	readme      string
 	fail        bool
 	exes        string
 }
@@ -63,11 +64,14 @@ func (m *mockS3) UploadData(data io.Reader, dest string) error {
 		return err
 	}
 
-	if strings.HasSuffix(dest, ".def") {
+	switch filepath.Ext(dest) {
+	case ".def":
 		m.data = string(buff)
 		m.def = dest
-	} else if strings.HasSuffix(dest, ".yml") {
+	case ".yml":
 		m.softpackYML = string(buff)
+	case ".md":
+		m.readme = string(buff)
 	}
 
 	return nil
@@ -411,13 +415,15 @@ packages:
   - r-seurat@4
 `
 
+			expectedReadmeContent := "module load " + moduleLoadPrefix + "/groups/hgi/xxhash/0.8.1"
+
 			for file, expectedData := range map[string]string{
 				softpackYaml:           expectedSoftpackYaml,
 				moduleForCoreBasename:  "module-whatis",
 				singularityDefBasename: "specs:\n  - xxhash@0.8.1 arch=None-None-x86_64_v4",
 				spackLock:              `"concrete_specs":`,
 				builderOut:             "output",
-				usageBasename:          "module load " + moduleLoadPrefix + "/groups/hgi/xxhash/0.8.1",
+				usageBasename:          expectedReadmeContent,
 			} {
 				data, okg := mc.getFile("groups/hgi/xxhash-0.8.1/" + file)
 				So(okg, ShouldBeTrue)
@@ -428,6 +434,7 @@ packages:
 			So(ok, ShouldBeFalse)
 
 			So(ms3.softpackYML, ShouldEqual, expectedSoftpackYaml)
+			So(ms3.readme, ShouldContainSubstring, expectedReadmeContent)
 		})
 
 		Convey("Build returns an error if the upload fails", func() {
