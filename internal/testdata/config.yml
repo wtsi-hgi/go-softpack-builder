@@ -18,6 +18,7 @@ spack:
   binaryCache: "https://binaries.spack.io/develop"
   buildImage: "spack/ubuntu-jammy:latest"
   finalImage: "ubuntu:22.04"
+  processorTarget: "x86_64_v4"
 
 coreURL: "http://x.y.z:9837/graphql"
 listenURL: "localhost:2456"
