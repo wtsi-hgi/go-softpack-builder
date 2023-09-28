@@ -33,7 +33,6 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/url"
-	"os"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -182,7 +181,6 @@ type Builder struct {
 	config *config.Config
 	s3     interface {
 		UploadData(data io.Reader, dest string) error
-		DownloadFile(source, dest string) error
 		OpenFile(source string) (io.ReadCloser, error)
 	}
 	runner interface {
@@ -327,18 +325,6 @@ func (b *Builder) asyncBuild(def *Definition, wrInput, s3Path, singDef string) e
 		return err
 	}
 
-	tmpDir, err := os.MkdirTemp("", "")
-	if err != nil {
-		return err
-	}
-
-	defer os.RemoveAll(tmpDir)
-
-	imagePath := filepath.Join(tmpDir, imageBasename)
-	if err = b.s3.DownloadFile(filepath.Join(s3Path, imageBasename), imagePath); err != nil {
-		return err
-	}
-
 	exes, err := b.getExes(s3Path)
 	if err != nil {
 		return err
@@ -346,11 +332,11 @@ func (b *Builder) asyncBuild(def *Definition, wrInput, s3Path, singDef string) e
 
 	moduleFileData := def.ToModule(b.config.Module.ScriptsInstallDir, b.config.Module.Dependencies, exes)
 
-	if err = b.prepareAndInstallArtifacts(def, imagePath, moduleFileData, exes); err != nil {
+	if err = b.prepareAndInstallArtifacts(def, s3Path, moduleFileData, exes); err != nil {
 		return err
 	}
 
-	return b.prepareArtifactsFromS3AndSendToCoreAndS3(def, s3Path, imagePath, moduleFileData, singDef, exes)
+	return b.prepareArtifactsFromS3AndSendToCoreAndS3(def, s3Path, moduleFileData, singDef, exes)
 }
 
 func (b *Builder) addLogToRepo(s3Path, environmentPath string) {
@@ -382,26 +368,25 @@ func (b *Builder) getExes(s3Path string) ([]string, error) {
 	return strings.Split(strings.TrimSpace(string(buf)), "\n"), nil
 }
 
-func (b *Builder) prepareAndInstallArtifacts(def *Definition, imagePath,
+func (b *Builder) prepareAndInstallArtifacts(def *Definition, s3Path,
 	moduleFileData string, exes []string) error {
-	imageFile, err := os.Open(imagePath)
-	if err != nil {
-		return err
-	}
-	defer imageFile.Close()
-
-	return installModule(b.config.Module.ScriptsInstallDir, b.config.Module.ModuleInstallDir, def,
-		strings.NewReader(moduleFileData), imageFile, exes, b.config.Module.WrapperScript)
-}
-
-func (b *Builder) prepareArtifactsFromS3AndSendToCoreAndS3(def *Definition, s3Path,
-	imagePath, moduleFileData, singDef string, exes []string) error {
-	logData, lockData, imageData, err := b.getArtifactDataFromS3(s3Path, imagePath)
+	imageData, err := b.s3.OpenFile(filepath.Join(s3Path, imageBasename))
 	if err != nil {
 		return err
 	}
 
 	defer imageData.Close()
+
+	return installModule(b.config.Module.ScriptsInstallDir, b.config.Module.ModuleInstallDir, def,
+		strings.NewReader(moduleFileData), imageData, exes, b.config.Module.WrapperScript)
+}
+
+func (b *Builder) prepareArtifactsFromS3AndSendToCoreAndS3(def *Definition, s3Path,
+	moduleFileData, singDef string, exes []string) error {
+	logData, lockData, err := b.getArtifactDataFromS3(s3Path)
+	if err != nil {
+		return err
+	}
 
 	concreteSpackYAMLFile, err := SpackLockToSoftPackYML(lockData, def.Description, exes)
 	if err != nil {
@@ -414,7 +399,6 @@ func (b *Builder) prepareArtifactsFromS3AndSendToCoreAndS3(def *Definition, s3Pa
 
 	return b.addArtifactsToRepo(
 		map[string]io.Reader{
-			imageBasename:          imageData,
 			spackLock:              bytes.NewReader(lockData),
 			softpackYaml:           strings.NewReader(concreteSpackYAMLFile),
 			singularityDefBasename: strings.NewReader(singDef),
@@ -426,28 +410,23 @@ func (b *Builder) prepareArtifactsFromS3AndSendToCoreAndS3(def *Definition, s3Pa
 	)
 }
 
-func (b *Builder) getArtifactDataFromS3(s3Path, imagePath string) (io.Reader, []byte, io.ReadCloser, error) {
+func (b *Builder) getArtifactDataFromS3(s3Path string) (io.Reader, []byte, error) {
 	logData, err := b.s3.OpenFile(filepath.Join(s3Path, builderOut))
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, err
 	}
 
 	lockFile, err := b.s3.OpenFile(filepath.Join(s3Path, spackLock))
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, err
 	}
 
 	lockData, err := io.ReadAll(lockFile)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, err
 	}
 
-	imageFile, err := os.Open(imagePath)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-
-	return logData, lockData, imageFile, nil
+	return logData, lockData, nil
 }
 
 type ConcreteSpec struct {

@@ -59,14 +59,6 @@ func (s *S3) UploadData(data io.Reader, dest string) error {
 	return s.S3Accessor.UploadData(data, dest)
 }
 
-// DownloadFile downloads the given S3 bucket/source object to dest path on
-// local disk.
-func (s *S3) DownloadFile(source, dest string) error {
-	source = s.RemotePath(source)
-
-	return s.S3Accessor.DownloadFile(source, dest)
-}
-
 // OpenFile lets you stream the given S3 bucket/source object.
 func (s *S3) OpenFile(source string) (io.ReadCloser, error) {
 	source = s.RemotePath(source)

@@ -26,7 +26,6 @@ package s3
 import (
 	"io"
 	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
@@ -61,23 +60,6 @@ func TestS3(t *testing.T) {
 			So(err, ShouldBeNil)
 			So(len(entries), ShouldEqual, 1)
 			So(entries[0].Name, ShouldEqual, basePath+"/"+basename)
-
-			Convey("And then download it", func() {
-				tmpDir := t.TempDir()
-				tmpFile := filepath.Join(tmpDir, basename)
-
-				err := s3.DownloadFile(basename, tmpFile)
-				So(err, ShouldBeNil)
-
-				f, err := os.Open(tmpFile)
-				So(err, ShouldBeNil)
-
-				defer f.Close()
-
-				buf, err := io.ReadAll(f)
-				So(err, ShouldBeNil)
-				So(string(buf), ShouldEqual, testData)
-			})
 
 			Convey("And then open it", func() {
 				f, err := s3.OpenFile(basename)
