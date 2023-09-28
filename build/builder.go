@@ -344,7 +344,7 @@ func (b *Builder) asyncBuild(def *Definition, wrInput, s3Path, singDef string) e
 		return err
 	}
 
-	moduleFileData := def.ToModule(b.config.Module.InstallDir, b.config.Module.Dependencies, exes)
+	moduleFileData := def.ToModule(b.config.Module.ScriptsInstallDir, b.config.Module.Dependencies, exes)
 
 	if err = b.prepareAndInstallArtifacts(def, imagePath, moduleFileData, exes); err != nil {
 		return err
@@ -390,7 +390,7 @@ func (b *Builder) prepareAndInstallArtifacts(def *Definition, imagePath,
 	}
 	defer imageFile.Close()
 
-	return installModule(b.config.Module.InstallDir, def,
+	return installModule(b.config.Module.ScriptsInstallDir, b.config.Module.ModuleInstallDir, def,
 		strings.NewReader(moduleFileData), imageFile, exes, b.config.Module.WrapperScript)
 }
 
