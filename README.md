@@ -1,6 +1,48 @@
 # go-softpack-builder (gsb)
 Go implementation of a softpack builder service.
 
+After receiving a POST (see Testing section below) with desired environment
+details, this service does the following:
+
+1. A singularity definition file, singularity.def, is created and uploaded to
+   an environment-specific subdirectory of your S3 build location.
+   The definition uses a spack image to run spack commands that install the
+   desired versions of the spack packages specified in the POST. The results
+   are then copied in to a smaller final image.
+2. A job is supplied to `wr add`. This job essentially runs `singularity build`
+   in a fuse mount of the environment-specific subdirectory of your S3 build
+   location. Outputs of the build end up in S3: the built image itself
+   (singularity.sif), stdout&err of the build attempt (builder.out), a list of
+   the executables added to PATH as a result of installing the requested
+   packages - not their dependencies - (executables), and the spack.lock file
+   that spack generates containing the concrete versions of everything it
+   installed.
+3. In the case of build failure, builder.out containing the error message will
+   be in the S3 location, and it will also be sent to core, which should then
+   indicate the failure on the softpack-web frontend.
+   In the case of build success, the remaining steps are carried out.
+4. A tcl module file is generated and installed in your local installation dir.
+   This file defines help (a combination of the description specified in the
+   POST, and a list of the executables), whatis info (listing the desired
+   packages), and prepends to PATH the local scripts directory for this
+   environment.
+5. The singularity.sif is downloaded from S3 and placed in the scripts
+   directory, along with symlinks for each executable to your wrapper script
+   (which as per wrapper.example, should `singularity run` the sif file,
+   supplying the exe basename and any other args).
+6. A softpack.yml file is generated, containing the help text from the module as
+   the description, and the concrete desired packages from the lock file. A
+   README.md is also generated, with simple usage instructions in it
+   (`module load [installed module path]`). In case step 6 fails, these are
+   uploaded to the S3 build location.
+7. The main files in S3 (singularity.def, spack.lock, builder.out,
+   softpack.yml, README.md), along with the previously generated module file are
+   sent to the core service, so it can add them to your softpack artifacts repo
+   and make the new environment findable with the softpack-web frontend.
+   Note that the image is not sent to core, so the repo doesn't get too large.
+   It can be reproduced exactly at any time using the singularity.def, assuming
+   you configure specific images (ie. not :latest) to use.
+
 ## Initial setup
 
 You'll need an S3 bucket to be a binary cache, which needs GPG keys. Here's one
@@ -146,7 +188,8 @@ curl -X POST -H "Content-Type: application/json" --data-binary @- "$url" <<HERED
 	"model": {
 		"description": "A simple description",
 		"packages": [{
-			"name": "xxhash"
+			"name": "xxhash",
+			"version": "0.8.1"
 		}]
 	}
 }
