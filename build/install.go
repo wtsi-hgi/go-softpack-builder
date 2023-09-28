@@ -36,16 +36,16 @@ const (
 	flags            = os.O_EXCL | os.O_CREATE | os.O_WRONLY
 )
 
-func installModule(installBase string, def *Definition, module,
+func installModule(scriptInstallBase, moduleInstallBase string, def *Definition, module,
 	image io.Reader, exes []string, wrapperScript string) (err error) {
-	var installDir, scriptsDir string
+	var scriptsDir, moduleDir string
 
-	installDir, scriptsDir, err = makeModuleDirs(installBase, def)
+	scriptsDir, moduleDir, err = makeModuleDirs(scriptInstallBase, moduleInstallBase, def)
 	if err != nil {
 		return err
 	}
 
-	modulePath := filepath.Join(installDir, def.EnvironmentVersion)
+	modulePath := filepath.Join(moduleDir, def.EnvironmentVersion)
 
 	defer func() {
 		if err != nil {
@@ -65,25 +65,38 @@ func installModule(installBase string, def *Definition, module,
 	return createExeSymlinks(wrapperScript, scriptsDir, exes)
 }
 
-func makeModuleDirs(installBase string, def *Definition) (string, string, error) {
-	installDir := filepath.Join(installBase, def.EnvironmentPath, def.EnvironmentName)
-	scriptsDir := filepath.Join(installDir, def.EnvironmentVersion+scriptsDirSuffix)
+func makeModuleDirs(scriptInstallBase, moduleInstallBase string, def *Definition) (string, string, error) {
+	scriptsDir := filepath.Join(scriptInstallBase, def.EnvironmentPath,
+		def.EnvironmentName, def.EnvironmentVersion+scriptsDirSuffix)
+	moduleDir := filepath.Join(moduleInstallBase, def.EnvironmentPath, def.EnvironmentName)
 
-	if err := os.MkdirAll(scriptsDir, perms); err != nil {
+	if err := makeDirectory(scriptsDir, scriptInstallBase); err != nil {
 		return "", "", err
 	}
 
-	dir := scriptsDir
-
-	for dir != installBase {
-		if err := os.Chmod(dir, perms); err != nil {
-			return "", "", err
-		}
-
-		dir = filepath.Dir(dir)
+	if err := makeDirectory(moduleDir, moduleInstallBase); err != nil {
+		return "", "", err
 	}
 
-	return installDir, scriptsDir, nil
+	return scriptsDir, moduleDir, nil
+}
+
+// makeDirectory does a MkdirAll for leafDir, and then makes sure it and it's
+// parents up to baseDir are world accesible.
+func makeDirectory(leafDir, baseDir string) error {
+	if err := os.MkdirAll(leafDir, perms); err != nil {
+		return err
+	}
+
+	for leafDir != baseDir {
+		if err := os.Chmod(leafDir, perms); err != nil {
+			return err
+		}
+
+		leafDir = filepath.Dir(leafDir)
+	}
+
+	return nil
 }
 
 func installFile(data io.Reader, path string) (err error) {

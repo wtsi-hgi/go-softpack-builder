@@ -3,7 +3,8 @@ s3:
   buildBase: "spack/builds"
 
 module:
-  installDir:  "/software/modules/HGI/softpack"
+  moduleInstallDir:  "/software/modules/HGI/softpack"
+  scriptsInstallDir:  "/software/hgi/softpack/installs"
   loadPath: "HGI/softpack"
   wrapperScript: "/path/to/wrapper/script"
   dependencies:

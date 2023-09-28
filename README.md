@@ -64,7 +64,8 @@ s3:
   buildBase: "spack/builds"
 
 module:
-  installDir:  "/path/to/modules/softpack"
+  moduleInstallDir:  "/path/to/tcl_modules/softpack"
+  scriptsInstallDir: "/different/path/for/images_and_scripts"
   loadPath: "softpack"
   dependencies:
     - "/path/to/modules/singularity/3.10.0"
@@ -88,10 +89,14 @@ Where:
   binary cache and has the gpg files copied to it.
 - buildBase is the bucket and optional sub "directory" that builds will occur
   in.
-- installDir is the absolute base path that modules will be installed to
+- moduleInstallDir is the absolute base path that modules will be installed to
   following a build. This directory needs to be accessible by your users.
   Directories and files that gsb creates within will be world readable and
   executable.
+- scriptsInstallDir is like moduleInstallDir, but will contain the images and
+  wrapper script symlinks for your builds. These are kept separately from the
+  tcl module files, because having large files alongside the tcl file will slow
+  down the module system.
 - loadPath is the base that users `module load`.
 - dependencies are any module dependencies that need to be loaded because that
   software won't be part of the environments being built. Users will at least

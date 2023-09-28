@@ -40,7 +40,8 @@ func TestConfig(t *testing.T) {
 
 		So(config.S3.BinaryCache, ShouldEqual, "spack")
 		So(config.S3.BuildBase, ShouldEqual, "spack/builds")
-		So(config.Module.InstallDir, ShouldEqual, "/software/modules/HGI/softpack")
+		So(config.Module.ModuleInstallDir, ShouldEqual, "/software/modules/HGI/softpack")
+		So(config.Module.ScriptsInstallDir, ShouldEqual, "/software/hgi/softpack/installs")
 		So(config.Module.LoadPath, ShouldEqual, "HGI/softpack")
 		So(config.Module.WrapperScript, ShouldEqual, "/path/to/wrapper/script")
 		So(config.Module.Dependencies, ShouldResemble, []string{"/software/modules/ISG/singularity/3.10.0"})

@@ -329,7 +329,8 @@ Stage: final
 		slog.SetDefault(slog.New(slog.NewTextHandler(&logWriter, nil)))
 
 		Convey("You can do a Build", func() {
-			conf.Module.InstallDir = t.TempDir()
+			conf.Module.ModuleInstallDir = t.TempDir()
+			conf.Module.ScriptsInstallDir = t.TempDir()
 			conf.Module.WrapperScript = "/path/to/wrapper"
 			conf.Module.LoadPath = moduleLoadPrefix
 			ms3.exes = "xxhsum\nxxh32sum\nxxh64sum\nxxh128sum\nR\nRscript\npython\n"
@@ -343,11 +344,10 @@ Stage: final
 			<-mwr.ch
 			So(mwr.cmd, ShouldContainSubstring, "echo doing build in some_path/groups/hgi/xxhash/0.8.1; sudo singularity build")
 
-			envPath := filepath.Join(conf.Module.InstallDir,
-				def.EnvironmentPath, def.EnvironmentName)
-
-			modulePath := filepath.Join(envPath, def.EnvironmentVersion)
-			scriptsPath := filepath.Join(envPath, def.EnvironmentVersion+scriptsDirSuffix)
+			modulePath := filepath.Join(conf.Module.ModuleInstallDir,
+				def.EnvironmentPath, def.EnvironmentName, def.EnvironmentVersion)
+			scriptsPath := filepath.Join(conf.Module.ScriptsInstallDir,
+				def.EnvironmentPath, def.EnvironmentName, def.EnvironmentVersion+scriptsDirSuffix)
 			imagePath := filepath.Join(scriptsPath, imageBasename)
 			expectedExes := []string{"python", "R", "Rscript", "xxhsum", "xxh32sum", "xxh64sum", "xxh128sum"}
 
@@ -379,8 +379,18 @@ Stage: final
 			perm := info.Mode().Perm()
 			So(perm.String(), ShouldEqual, "-rwxr-xr-x")
 
-			dir := scriptsPath
-			for dir != conf.Module.InstallDir {
+			dir := modulePath
+			for dir != conf.Module.ModuleInstallDir {
+				info, err = os.Stat(dir)
+				So(err, ShouldBeNil)
+				perm = info.Mode().Perm()
+				So(perm&0755, ShouldEqual, 0755)
+
+				dir = filepath.Dir(dir)
+			}
+
+			dir = scriptsPath
+			for dir != conf.Module.ScriptsInstallDir {
 				info, err = os.Stat(dir)
 				So(err, ShouldBeNil)
 				perm = info.Mode().Perm()
@@ -458,7 +468,8 @@ packages:
 		})
 
 		Convey("You can't run the same build simultaneously", func() {
-			conf.Module.InstallDir = t.TempDir()
+			conf.Module.ModuleInstallDir = t.TempDir()
+			conf.Module.ScriptsInstallDir = t.TempDir()
 			conf.Module.WrapperScript = "/path/to/wrapper"
 			conf.Module.LoadPath = moduleLoadPrefix
 			ms3.exes = "xxhsum\nxxh32sum\nxxh64sum\nxxh128sum\n"

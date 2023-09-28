@@ -35,24 +35,27 @@ import (
 
 func TestInstall(t *testing.T) {
 	Convey("Given a Spack Definition, image file Reader, and a module file reader, install the files", t, func() {
-		tmpDir := t.TempDir()
+		tmpScriptsDir := t.TempDir()
+		tmpModulesDir := t.TempDir()
 
 		def := getExampleDefinition()
 		moduleFile := "some module file"
 		imageFile := "some image file"
 
-		// exes would normally come from running ???, and wrapperScript would
-		// come from config
+		// exes would normally be determined during the build process, and
+		// wrapperScript would come from config
 		exes := []string{"a", "b"}
-		wrapperScript := filepath.Join(tmpDir, "wrapper.script")
+		wrapperScript := "/path/to/wrapper.script"
 
-		err := installModule(tmpDir, def, strings.NewReader(moduleFile), strings.NewReader(imageFile), exes, wrapperScript)
+		err := installModule(tmpScriptsDir, tmpModulesDir, def,
+			strings.NewReader(moduleFile), strings.NewReader(imageFile), exes, wrapperScript)
 		So(err, ShouldBeNil)
 
-		createdModuleFile := readFile(filepath.Join(tmpDir, def.EnvironmentPath, def.EnvironmentName, def.EnvironmentVersion))
-		scriptsDir := filepath.Join(tmpDir, def.EnvironmentPath, def.EnvironmentName,
+		createdModuleFile := readFile(t, filepath.Join(tmpModulesDir, def.EnvironmentPath,
+			def.EnvironmentName, def.EnvironmentVersion))
+		scriptsDir := filepath.Join(tmpScriptsDir, def.EnvironmentPath, def.EnvironmentName,
 			def.EnvironmentVersion+scriptsDirSuffix)
-		createdImageFile := readFile(filepath.Join(scriptsDir, imageBasename))
+		createdImageFile := readFile(t, filepath.Join(scriptsDir, imageBasename))
 
 		So(createdModuleFile, ShouldEqual, moduleFile)
 		So(createdImageFile, ShouldEqual, imageFile)
@@ -65,7 +68,9 @@ func TestInstall(t *testing.T) {
 	})
 }
 
-func readFile(path string) string {
+func readFile(t *testing.T, path string) string {
+	t.Helper()
+
 	f, err := os.Open(path)
 	So(err, ShouldBeNil)
 
