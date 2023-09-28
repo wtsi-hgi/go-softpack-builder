@@ -419,8 +419,8 @@ packages:
 				builderOut:             "output",
 				usageBasename:          "module load " + moduleLoadPrefix + "/groups/hgi/xxhash/0.8.1",
 			} {
-				data, ok := mc.getFile("groups/hgi/xxhash-0.8.1/" + file)
-				So(ok, ShouldBeTrue)
+				data, okg := mc.getFile("groups/hgi/xxhash-0.8.1/" + file)
+				So(okg, ShouldBeTrue)
 				So(data, ShouldContainSubstring, expectedData)
 			}
 
