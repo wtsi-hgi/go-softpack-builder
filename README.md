@@ -147,7 +147,7 @@ Where:
   images.
 - customSpackRepo is your own repository of Spack packages containing your own
   custom recipies. It will be used in addition to Spack's build-in repo during
-  builds.
+  builds. If no ref is ref is specified, then the latest commit will be used.
 - spack.binaryCache is the URL of spack's binary cache. The version should match
   the spack version in your buildImage. You can find the URLs via
   https://cache.spack.io.

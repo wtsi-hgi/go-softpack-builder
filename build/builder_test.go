@@ -233,11 +233,11 @@ func TestBuilder(t *testing.T) {
 		def := getExampleDefinition()
 
 		Convey("You can generate a singularity .def", func() {
-			def, err := builder.generateSingularityDef(def)
+			defFile, err := builder.generateSingularityDef(def)
 
 			So(err, ShouldBeNil)
 			//nolint:lll
-			So(def, ShouldEqual, `Bootstrap: docker
+			So(defFile, ShouldEqual, `Bootstrap: docker
 From: spack/ubuntu-jammy:v0.20.1
 Stage: build
 
@@ -311,6 +311,25 @@ Stage: final
 	# Modify the environment without relying on sourcing shell specific files at startup
 	cat /opt/spack-environment/environment_modifications.sh >> $SINGULARITY_ENVIRONMENT
 `)
+
+			repoURL := os.Getenv("GSB_TEST_REPO_URL")
+			repoCommit := os.Getenv("GSB_TEST_REPO_COMMIT")
+
+			if repoURL == "" || repoCommit == "" {
+				SkipConvey("real test skipped, set GSB_TEST_REPO_URL and GSB_TEST_REPO_COMMIT to enable.", func() {})
+
+				return
+			}
+
+			Convey("", func() {
+				conf.CustomSpackRepo.URL = repoURL
+				conf.CustomSpackRepo.Ref = ""
+
+				defFile, err := builder.generateSingularityDef(def)
+
+				So(err, ShouldBeNil)
+				So(defFile, ShouldContainSubstring, "git clone \""+repoURL+"\" \"$tmpDir\"\n\tgit -C \"$tmpDir\" checkout \""+repoCommit+"\"")
+			})
 		})
 
 		var logWriter concurrentStringBuilder
