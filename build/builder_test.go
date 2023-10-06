@@ -324,11 +324,13 @@ Stage: final
 			Convey("", func() {
 				conf.CustomSpackRepo.URL = repoURL
 				conf.CustomSpackRepo.Ref = ""
+				expectedSubstring := "git clone \"" + repoURL + "\" \"$tmpDir\"\n" +
+					"\tgit -C \"$tmpDir\" checkout \"" + repoCommit + "\""
 
 				defFile, err := builder.generateSingularityDef(def)
 
 				So(err, ShouldBeNil)
-				So(defFile, ShouldContainSubstring, "git clone \""+repoURL+"\" \"$tmpDir\"\n\tgit -C \"$tmpDir\" checkout \""+repoCommit+"\"")
+				So(defFile, ShouldContainSubstring, expectedSubstring)
 			})
 		})
 
