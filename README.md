@@ -112,9 +112,7 @@ module:
   dependencies:
     - "/path/to/modules/singularity/3.10.0"
 
-customSpackRepo:
-  url: "https://github.com/org/spack-repo.git"
-  ref: "main"
+customSpackRepo: "https://github.com/org/spack-repo.git"
 
 spack:
   binaryCache: "https://binaries.spack.io/v0.20.1"

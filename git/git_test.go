@@ -21,36 +21,49 @@
  * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  ******************************************************************************/
 
-package config
+package git
 
 import (
+	"net/http/httptest"
+	"os"
 	"testing"
 
 	. "github.com/smartystreets/goconvey/convey"
-	"github.com/wtsi-hgi/go-softpack-builder/internal"
+	"github.com/wtsi-hgi/go-softpack-builder/internal/gitmock"
 )
 
-func TestConfig(t *testing.T) {
-	Convey("Given a yaml config file, it can be Parse()d", t, func() {
-		configData, err := internal.TestData.Open("testdata/config.yml")
-		So(err, ShouldBeNil)
+func TestGetLatestCommit(t *testing.T) {
+	Convey("Given a mock git server", t, func() {
+		mg, commitHash := gitmock.New()
+		ts := httptest.NewServer(mg)
 
-		config, err := Parse(configData)
-		So(err, ShouldBeNil)
+		Convey("you can retrieve latest commit hash on primary branch from a dumb server", func() {
+			commit, err := GetLatestCommit(ts.URL)
+			So(err, ShouldBeNil)
+			So(commit, ShouldEqual, commitHash)
+		})
 
-		So(config.S3.BinaryCache, ShouldEqual, "spack")
-		So(config.S3.BuildBase, ShouldEqual, "spack/builds")
-		So(config.Module.ModuleInstallDir, ShouldEqual, "/software/modules/HGI/softpack")
-		So(config.Module.ScriptsInstallDir, ShouldEqual, "/software/hgi/softpack/installs")
-		So(config.Module.LoadPath, ShouldEqual, "HGI/softpack")
-		So(config.Module.WrapperScript, ShouldEqual, "/path/to/wrapper/script")
-		So(config.Module.Dependencies, ShouldResemble, []string{"/software/modules/ISG/singularity/3.10.0"})
-		So(config.CustomSpackRepo, ShouldEqual, "https://github.com/org/spack")
-		So(config.Spack.BinaryCache, ShouldEqual, "https://binaries.spack.io/develop")
-		So(config.Spack.BuildImage, ShouldEqual, "spack/ubuntu-jammy:latest")
-		So(config.Spack.FinalImage, ShouldEqual, "ubuntu:22.04")
-		So(config.Spack.ProcessorTarget, ShouldEqual, "x86_64_v4")
-		So(config.CoreURL, ShouldEqual, "http://x.y.z:9837/graphql")
-		So(config.ListenURL, ShouldEqual, "localhost:2456")
+		Convey("you can retrieve latest commit hash on primary branch from a smart server", func() {
+			mg.Smart = true
+
+			commit, err := GetLatestCommit(ts.URL)
+			So(err, ShouldBeNil)
+			So(commit, ShouldEqual, commitHash)
+		})
+	})
+
+	repoURL := os.Getenv("GSB_TEST_REPO_URL")
+	repoCommit := os.Getenv("GSB_TEST_REPO_COMMIT")
+
+	if repoURL == "" || repoCommit == "" {
+		SkipConvey("real test skipped, set GSB_TEST_REPO_URL and GSB_TEST_REPO_COMMIT to enable.", t, func() {})
+
+		return
+	}
+
+	Convey("Given a URL to a real git server you can retrieve the latest hash from the primary branch", t, func() {
+		commit, err := GetLatestCommit(repoURL)
+		So(err, ShouldBeNil)
+		So(commit, ShouldEqual, repoCommit)
 	})
 }

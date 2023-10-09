@@ -39,6 +39,7 @@ import (
 	"text/template"
 
 	"github.com/wtsi-hgi/go-softpack-builder/config"
+	"github.com/wtsi-hgi/go-softpack-builder/git"
 	"github.com/wtsi-hgi/go-softpack-builder/s3"
 	"github.com/wtsi-hgi/go-softpack-builder/wr"
 )
@@ -295,11 +296,16 @@ func (b *Builder) generateAndUploadSingularityDef(def *Definition, s3Path string
 // repo details to create a singularity definition file that will use Spack to
 // build the Packages in the Definition.
 func (b *Builder) generateSingularityDef(def *Definition) (string, error) {
+	repoRef, err := git.GetLatestCommit(b.config.CustomSpackRepo)
+	if err != nil {
+		return "", err
+	}
+
 	var w strings.Builder
-	err := singularityTmpl.Execute(&w, &templateVars{
+	err = singularityTmpl.Execute(&w, &templateVars{
 		S3BinaryCache:    b.config.S3.BinaryCache,
-		RepoURL:          b.config.CustomSpackRepo.URL,
-		RepoRef:          b.config.CustomSpackRepo.Ref,
+		RepoURL:          b.config.CustomSpackRepo,
+		RepoRef:          repoRef,
 		SpackBinaryCache: b.config.Spack.BinaryCache,
 		ProcessorTarget:  b.config.Spack.ProcessorTarget,
 		BuildImage:       b.config.Spack.BuildImage,

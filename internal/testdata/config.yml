@@ -10,9 +10,7 @@ module:
   dependencies:
     - "/software/modules/ISG/singularity/3.10.0"
 
-customSpackRepo:
-  url: "https://github.com/org/spack"
-  ref: "aaaaaaa"
+customSpackRepo: "https://github.com/org/spack"
 
 spack:
   binaryCache: "https://binaries.spack.io/develop"
