@@ -39,6 +39,7 @@ import (
 
 	. "github.com/smartystreets/goconvey/convey"
 	"github.com/wtsi-hgi/go-softpack-builder/config"
+	"github.com/wtsi-hgi/go-softpack-builder/internal/gitmock"
 	"github.com/wtsi-hgi/go-softpack-builder/wr"
 )
 
@@ -212,11 +213,14 @@ func TestBuilder(t *testing.T) {
 		mc := &mockCore{files: make(map[string]string)}
 		msc := httptest.NewServer(mc)
 
+		gm, commitHash := gitmock.New()
+
+		gmhttp := httptest.NewServer(gm)
+
 		var conf config.Config
 		conf.S3.BinaryCache = "s3://spack"
 		conf.S3.BuildBase = "some_path"
-		conf.CustomSpackRepo.URL = "https://github.com/spack/repo"
-		conf.CustomSpackRepo.Ref = "some_tag"
+		conf.CustomSpackRepo = gmhttp.URL
 		conf.CoreURL = msc.URL
 		conf.Spack.BinaryCache = "https://binaries.spack.io/v0.20.1"
 		conf.Spack.BuildImage = "spack/ubuntu-jammy:v0.20.1"
@@ -267,8 +271,8 @@ EOF
 	spack mirror add spackCache https://binaries.spack.io/v0.20.1
 	spack mirror add s3cache "s3://spack"
 	tmpDir="$(mktemp -d)"
-	git clone "https://github.com/spack/repo" "$tmpDir"
-	git -C "$tmpDir" checkout "some_tag"
+	git clone "`+gmhttp.URL+`" "$tmpDir"
+	git -C "$tmpDir" checkout "`+commitHash+`"
 	spack repo add "$tmpDir"
 	spack buildcache keys --install --trust
 	spack config add "config:install_tree:padded_length:128"
@@ -322,8 +326,7 @@ Stage: final
 			}
 
 			Convey("", func() {
-				conf.CustomSpackRepo.URL = repoURL
-				conf.CustomSpackRepo.Ref = ""
+				conf.CustomSpackRepo = repoURL
 				expectedSubstring := "git clone \"" + repoURL + "\" \"$tmpDir\"\n" +
 					"\tgit -C \"$tmpDir\" checkout \"" + repoCommit + "\""
 

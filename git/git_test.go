@@ -24,114 +24,17 @@
 package git
 
 import (
-	crypto "crypto/rand"
-	"encoding/base64"
-	"fmt"
-	"io"
-	"math/rand"
-	"net/http"
 	"net/http/httptest"
 	"os"
 	"testing"
 
 	. "github.com/smartystreets/goconvey/convey"
+	"github.com/wtsi-hgi/go-softpack-builder/internal/gitmock"
 )
-
-const (
-	ErrNotFound = Error("not found")
-)
-
-type mockGit struct {
-	refs       map[string]string
-	masterName string
-	smart      bool
-}
-
-func newMockGit() (*mockGit, string) {
-	numRefs := rand.Intn(5) + 5 //nolint:gosec
-
-	refs := make(map[string]string, numRefs)
-
-	var (
-		masterName, masterCommit string
-		hash                     [20]byte
-	)
-
-	for i := 0; i < numRefs; i++ {
-		randChars := make([]byte, rand.Intn(5)+5) //nolint:gosec
-		crypto.Read(randChars)                    //nolint:errcheck
-		crypto.Read(hash[:])                      //nolint:errcheck
-
-		masterName = base64.RawStdEncoding.EncodeToString(randChars)
-		masterCommit = fmt.Sprintf("%020X", hash)
-
-		refs[masterName] = masterCommit
-	}
-
-	return &mockGit{
-		refs:       refs,
-		masterName: masterName,
-	}, masterCommit
-}
-
-func (m *mockGit) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if err := m.handle(w, r.URL.Path); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-	}
-}
-
-func (m *mockGit) handle(w http.ResponseWriter, path string) error {
-	switch path {
-	case refsPath:
-		if m.smart {
-			w.Header().Set("Content-Type", smartContentType)
-
-			return m.handleSmartRefs(w)
-		}
-
-		return m.handleRefs(w)
-	case headPath:
-		return m.handleHead(w)
-	}
-
-	return ErrNotFound
-}
-
-func (m *mockGit) handleSmartRefs(w io.Writer) error {
-	if _, err := fmt.Fprintf(w, "%s002D%s %s\n", expectedHeader, m.refs[m.masterName], headRef); err != nil {
-		return err
-	}
-
-	for ref, commit := range m.refs {
-		if _, err := fmt.Fprintf(w, "%04X%s %s\n", 41+len(ref), commit, ref); err != nil {
-			return err
-		}
-	}
-
-	_, err := io.WriteString(w, "0000")
-
-	return err
-}
-
-func (m *mockGit) handleRefs(w io.Writer) error {
-	for ref, commit := range m.refs {
-		if _, err := fmt.Fprintf(w, "%s\t%s\n", commit, ref); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-func (m *mockGit) handleHead(w io.Writer) error {
-	_, err := io.WriteString(w, "ref: "+m.masterName)
-
-	return err
-}
 
 func TestGetLatestCommit(t *testing.T) {
 	Convey("Given a mock git server", t, func() {
-		mg, commitHash := newMockGit()
+		mg, commitHash := gitmock.New()
 		ts := httptest.NewServer(mg)
 
 		Convey("you can retrieve latest commit hash on primary branch from a dumb server", func() {
@@ -141,7 +44,7 @@ func TestGetLatestCommit(t *testing.T) {
 		})
 
 		Convey("you can retrieve latest commit hash on primary branch from a smart server", func() {
-			mg.smart = true
+			mg.Smart = true
 
 			commit, err := GetLatestCommit(ts.URL)
 			So(err, ShouldBeNil)

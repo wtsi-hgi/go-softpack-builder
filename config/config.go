@@ -44,11 +44,8 @@ type Config struct {
 		Dependencies      []string `yaml:"dependencies"`
 		WrapperScript     string   `yaml:"wrapperScript"`
 	} `yaml:"module"`
-	CustomSpackRepo struct {
-		URL string `yaml:"url"`
-		Ref string `yaml:"ref"`
-	} `yaml:"customSpackRepo"`
-	Spack struct {
+	CustomSpackRepo string `yaml:"customSpackRepo"`
+	Spack           struct {
 		BinaryCache     string `yaml:"binaryCache"`
 		BuildImage      string `yaml:"buildImage"`
 		FinalImage      string `yaml:"finalImage"`
@@ -66,14 +63,14 @@ func Parse(r io.Reader) (*Config, error) {
 		return nil, err
 	}
 
-	if c.CustomSpackRepo.URL != "" {
-		if _, err := url.Parse(c.CustomSpackRepo.URL); err != nil {
+	if c.CustomSpackRepo != "" {
+		if _, err := url.Parse(c.CustomSpackRepo); err != nil {
 			return nil, fmt.Errorf("invalid customSpackRepo.url: %w", err)
 		}
 	}
 
 	if c.CoreURL != "" {
-		if _, err := url.Parse(c.CustomSpackRepo.URL); err != nil {
+		if _, err := url.Parse(c.CoreURL); err != nil {
 			return nil, fmt.Errorf("invalid coreURL: %w", err)
 		}
 	}

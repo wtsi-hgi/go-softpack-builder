@@ -112,9 +112,7 @@ module:
   dependencies:
     - "/path/to/modules/singularity/3.10.0"
 
-customSpackRepo:
-  url: "https://github.com/org/spack-repo.git"
-  ref: "main"
+customSpackRepo: "https://github.com/org/spack-repo.git"
 
 spack:
   binaryCache: "https://binaries.spack.io/v0.20.1"
@@ -147,7 +145,7 @@ Where:
   images.
 - customSpackRepo is your own repository of Spack packages containing your own
   custom recipies. It will be used in addition to Spack's build-in repo during
-  builds. If no ref is ref is specified, then the latest commit will be used.
+  builds.
 - spack.binaryCache is the URL of spack's binary cache. The version should match
   the spack version in your buildImage. You can find the URLs via
   https://cache.spack.io.
