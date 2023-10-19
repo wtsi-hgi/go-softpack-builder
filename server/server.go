@@ -44,7 +44,9 @@ type Builder interface {
 	Build(*build.Definition) error
 }
 
-type request struct {
+// A Request object contains all of the information required to build an
+// environment.
+type Request struct {
 	Name    string
 	Version string
 	Model   struct {
@@ -57,7 +59,7 @@ type request struct {
 // receives request JSON.
 func New(b Builder) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		req := new(request)
+		req := new(Request)
 
 		if err := json.NewDecoder(r.Body).Decode(req); err != nil {
 			http.Error(w, fmt.Sprintf("error parsing request: %s", err), http.StatusBadRequest)

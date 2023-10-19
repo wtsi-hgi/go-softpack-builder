@@ -294,7 +294,7 @@ EOF
 	{
 		for pkg in "xxhash" "r-seurat" "py-anndata"; do
 			echo "$exes" | grep "/linux-[^/]*/gcc-[^/]*/$pkg-";
-		done | xargs -L 1 basename;
+		done | xargs -L 1 -r basename;
 		echo "R";
 		echo "Rscript";
 		echo "python";
