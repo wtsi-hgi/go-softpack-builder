@@ -49,7 +49,7 @@ EOF
 	{
 		for pkg in{{ range .Packages }} "{{ .Name }}"{{ end }}; do
 			echo "$exes" | grep "/linux-[^/]*/gcc-[^/]*/$pkg-";
-		done | xargs -L 1 basename;
+		done | xargs -L 1 -r basename;
 		{{- range .ExtraExes }}
 		echo "{{ . }}";
 		{{- end }}
