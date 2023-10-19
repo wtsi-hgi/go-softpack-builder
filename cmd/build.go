@@ -137,12 +137,7 @@ func readPackageInput(path string) []byte {
 
 		pkgsFile = os.Stdin
 	} else {
-		var err error
-
-		pkgsFile, err = os.Open(path)
-		if err != nil {
-			die("failed to open packages file: %s", err)
-		}
+		pkgsFile = openOrDie(path)
 
 		defer pkgsFile.Close()
 	}
@@ -161,4 +156,13 @@ func printIfTTY(msg string) {
 	}
 
 	fmt.Println(msg)
+}
+
+func openOrDie(path string) *os.File {
+	f, err := os.Open(path)
+	if err != nil {
+		die("failed to open file: %s", err)
+	}
+
+	return f
 }
