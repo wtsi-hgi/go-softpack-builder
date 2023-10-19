@@ -43,8 +43,10 @@ var buildPath, buildVersion, buildDescription, buildPackagesPath, buildURL strin
 
 var buildCmd = &cobra.Command{
 	Use:   "build",
-	Short: "",
-	Long:  ``,
+	Short: "Build an environment",
+	Long: `Build an environment.
+
+Allows manual builds without a softpack client.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		if buildURL == "" {
 			die("no gsb URL supplied")

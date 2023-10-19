@@ -34,19 +34,15 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// global options.
-var configPath string
-var debug bool
-
 // RootCmd represents the base command when called without any subcommands.
 var RootCmd = &cobra.Command{
-	Use:   "gsb",
-	Short: "gsb does something",
-	Long: `gsb does something.
+	Use:   os.Args[0],
+	Short: "gsb is a softpack builder",
+	Long: `gsb is a softpack builder.
 
-Help text!
+Start the server with the sever subcommand, then you can use the build
+subcommand to build new softpack environments.
 `,
-	Run: serverCmd,
 }
 
 // Execute adds all child commands to the root command and sets flags
@@ -56,14 +52,6 @@ func Execute() {
 	if err := RootCmd.Execute(); err != nil {
 		die(err.Error())
 	}
-}
-
-func init() {
-	// global flags
-	RootCmd.PersistentFlags().StringVar(&configPath, "config", "",
-		"path to config file")
-	RootCmd.PersistentFlags().BoolVar(&debug, "debug", false,
-		"turn on debug logging output")
 }
 
 // die is a convenience to log a message at the Error level and exit non zero.
