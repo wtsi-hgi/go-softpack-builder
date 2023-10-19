@@ -114,7 +114,7 @@ Where:
 - processorTarget should match the lowest common denominator CPU for the
   machines where builds will be used. For example, x86_64_v3.
 - coreURL is the URL of a running softpack core service, that will be used to
-  send build artifacts to so that it can store them in a softpack environements
+  send build artefacts to so that it can store them in a softpack environements
   git repository and make them visible on the softpack frontend.
 - listenURL is the address gsb will listen on for new build requests from core.`,
 	Run: func(_ *cobra.Command, _ []string) {
