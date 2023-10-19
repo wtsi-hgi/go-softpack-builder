@@ -140,6 +140,8 @@ Where:
 }
 
 func init() {
+	RootCmd.AddCommand(serverCmd)
+
 	serverCmd.Flags().StringVar(&configPath, "config", "",
 		"path to config file")
 	serverCmd.Flags().BoolVar(&debug, "debug", false,
