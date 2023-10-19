@@ -132,6 +132,7 @@ func getPackageList(path string) build.Packages {
 
 func readPackageInput(path string) []byte {
 	var pkgsFile *os.File
+
 	if path == "-" {
 		printIfTTY("Enter Packages (Ctrl+d to end): ")
 
