@@ -64,18 +64,23 @@ Allows manual builds without a softpack client.`,
 		pr, pw := io.Pipe()
 
 		go func() {
-			json.NewEncoder(pw).Encode(p)
+			json.NewEncoder(pw).Encode(p) //nolint:errcheck
 			pw.Close()
 		}()
 
-		req, _ := http.NewRequest(http.MethodPost, buildURL, pr)
+		req, err := http.NewRequest(http.MethodPost, buildURL, pr)
+		if err != nil {
+			die("failed to create build request: %s", err)
+		}
 
 		resp, err := http.DefaultClient.Do(req)
 		if err != nil {
 			die("failed to send request to builder: %s", err)
 		}
 
-		io.Copy(os.Stdout, resp.Body)
+		if _, err = io.Copy(os.Stdout, resp.Body); err != nil {
+			die("failed to copy response to stdout: %s", err)
+		}
 	},
 }
 
@@ -103,6 +108,8 @@ func readInput(prompt, given string) string {
 	return v
 }
 
+const pkgNameParts = 2
+
 func getPackageList(path string) build.Packages {
 	pkgsBytes := readPackageInput(path)
 
@@ -111,11 +118,11 @@ func getPackageList(path string) build.Packages {
 	pkgs := make(build.Packages, len(pkgList))
 
 	for n, pkgStr := range pkgList {
-		parts := strings.SplitN(strings.TrimSpace(pkgStr), "@", 2)
+		parts := strings.SplitN(strings.TrimSpace(pkgStr), "@", pkgNameParts)
 
 		pkgs[n].Name = parts[0]
 
-		if len(parts) == 2 {
+		if len(parts) == pkgNameParts {
 			pkgs[n].Version = parts[1]
 		}
 	}
@@ -126,9 +133,7 @@ func getPackageList(path string) build.Packages {
 func readPackageInput(path string) []byte {
 	var pkgsFile *os.File
 	if path == "-" {
-		if stdinIsTTY() {
-			fmt.Println("Enter Packages (Ctrl+d to end): ")
-		}
+		printIfTTY("Enter Packages (Ctrl+d to end): ")
 
 		pkgsFile = os.Stdin
 	} else {
@@ -150,8 +155,10 @@ func readPackageInput(path string) []byte {
 	return bytes.TrimSpace(pkgsBytes)
 }
 
-func stdinIsTTY() bool {
-	_, err := unix.IoctlGetWinsize(int(os.Stdin.Fd()), unix.TIOCGWINSZ)
+func printIfTTY(msg string) {
+	if _, err := unix.IoctlGetWinsize(int(os.Stdin.Fd()), unix.TIOCGWINSZ); err != nil {
+		return
+	}
 
-	return err == nil
+	fmt.Println(msg)
 }
