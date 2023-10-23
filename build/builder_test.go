@@ -532,11 +532,12 @@ packages:
 			})
 			So(ok, ShouldBeTrue)
 
-			expectedLog := "Post \\\"http://0.0.0.0:1234?groups%2Fhgi%2Fxxhash-0.8.1\\\": dial tcp 0.0.0.0:1234: connect: connection refused"
+			expectedLog := "Post \\\"http://0.0.0.0:1234?groups%2Fhgi%2Fxxhash-0.8.1\\\"" +
+				": dial tcp 0.0.0.0:1234: connect: connection refused"
 			So(logWriter.String(), ShouldContainSubstring, expectedLog)
 
 			conf.CoreURL = msc.URL
-			mc.err = errors.New("an error")
+			mc.err = Error("an error")
 
 			logWriter.Reset()
 			mwr.ch = make(chan struct{})

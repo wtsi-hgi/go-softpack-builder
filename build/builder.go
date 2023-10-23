@@ -28,7 +28,6 @@ import (
 	"context"
 	_ "embed"
 	"encoding/json"
-	"errors"
 	"io"
 	"log/slog"
 	"mime/multipart"
@@ -559,9 +558,9 @@ func (b *Builder) addArtifactsToRepo(artifacts map[string]io.Reader, envPath str
 	if resp.StatusCode != http.StatusOK {
 		var sb strings.Builder
 
-		io.Copy(&sb, resp.Body)
+		io.Copy(&sb, resp.Body) //nolint:errcheck
 
-		return errors.New(sb.String())
+		return Error(sb.String())
 	}
 
 	return <-errCh
