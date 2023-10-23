@@ -296,11 +296,10 @@ EOF
 	grep 'x-executable\|x-archive\|x-sharedlib' | \
 	awk -F: '{print $1}' | xargs strip
 
-	spack env activate .
-	exes="$(find $(echo $PATH | tr ":" "\n" | grep /opt/view/ | tr "\n" " ") -maxdepth 1 -executable -type l | xargs -L 1 readlink)";
+	exes="$(find $(grep "^export PATH=" /opt/spack-environment/environment_modifications.sh | sed -e 's/^export PATH=//' -e 's/;$//' | tr ":" "\n" | grep /opt/view | tr "\n" " ") -maxdepth 1 -executable -type l | xargs -r -L 1 readlink)";
 	{
 		for pkg in "xxhash" "r-seurat" "py-anndata"; do
-			echo "$exes" | grep "/linux-[^/]*/gcc-[^/]*/$pkg-";
+			echo "$exes" | grep "/linux-[^/]*/gcc-[^/]*/$pkg-" || true;
 		done | xargs -L 1 -r basename;
 		echo "R";
 		echo "Rscript";
