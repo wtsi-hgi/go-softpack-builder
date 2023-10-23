@@ -61,12 +61,13 @@ func SingularityBuildInS3WRInput(s3Path string) (string, error) {
 // Runner lets you Run() a wr add command.
 type Runner struct {
 	deployment string
+	memory     string
 }
 
 // New returns a Runner that will use the given wr deployment to wr add jobs
 // during Run().
 func New(deployment string) *Runner {
-	return &Runner{deployment: deployment}
+	return &Runner{deployment: deployment, memory: "43G"}
 }
 
 // Run pipes the given wrInput (eg. as produced by
@@ -78,7 +79,7 @@ func New(deployment string) *Runner {
 // generate an error, but just wait until that job completes.
 func (r *Runner) Run(wrInput string) error {
 	cmd := exec.Command("wr", "add", "--deployment", r.deployment, "--sync", //nolint:gosec
-		"--time", "8h", "--memory", "43G", "-o", "2", "--rerun")
+		"--time", "8h", "--memory", r.memory, "-o", "2", "--rerun")
 	cmd.Stdin = strings.NewReader(wrInput)
 
 	var std bytes.Buffer
