@@ -73,6 +73,8 @@ func TestWR(t *testing.T) {
 
 		runner := New("development")
 
+		runner.memory = "100M"
+
 		runArgs, repGrp := uniqueRunArgs("sleep 2s")
 		err := runner.Run(runArgs)
 		So(err, ShouldBeNil)

@@ -131,6 +131,7 @@ func (m *modifyRunner) Run(_ string) error {
 
 type mockCore struct {
 	mu    sync.RWMutex
+	err   error
 	files map[string]string
 }
 
@@ -150,7 +151,13 @@ func (m *mockCore) getFile(filename string) (string, bool) {
 	return contents, ok
 }
 
-func (m *mockCore) ServeHTTP(_ http.ResponseWriter, r *http.Request) {
+func (m *mockCore) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if m.err != nil {
+		http.Error(w, m.err.Error(), http.StatusInternalServerError)
+
+		return
+	}
+
 	mr, err := r.MultipartReader()
 	if err != nil {
 		return
@@ -289,11 +296,10 @@ EOF
 	grep 'x-executable\|x-archive\|x-sharedlib' | \
 	awk -F: '{print $1}' | xargs strip
 
-	spack env activate .
-	exes="$(find $(echo $PATH | tr ":" "\n" | grep /opt/view/ | tr "\n" " ") -maxdepth 1 -executable -type l | xargs -L 1 readlink)";
+	exes="$(find $(grep "^export PATH=" /opt/spack-environment/environment_modifications.sh | sed -e 's/^export PATH=//' -e 's/;$//' | tr ":" "\n" | grep /opt/view | tr "\n" " ") -maxdepth 1 -executable -type l | xargs -r -L 1 readlink)";
 	{
 		for pkg in "xxhash" "r-seurat" "py-anndata"; do
-			echo "$exes" | grep "/linux-[^/]*/gcc-[^/]*/$pkg-";
+			echo "$exes" | grep "/linux-[^/]*/gcc-[^/]*/$pkg-" || true;
 		done | xargs -L 1 -r basename;
 		echo "R";
 		echo "Rscript";
@@ -508,6 +514,47 @@ packages:
 			err = builder.Build(def)
 			So(err, ShouldNotBeNil)
 			So(err, ShouldEqual, ErrEnvironmentBuilding)
+		})
+
+		Convey("When the Core doesn't respond we get a meaningful error", func() {
+			conf.CoreURL = "http://0.0.0.0:1234"
+			conf.Module.ModuleInstallDir = t.TempDir()
+			conf.Module.ScriptsInstallDir = t.TempDir()
+			conf.Module.WrapperScript = "/path/to/wrapper"
+			conf.Module.LoadPath = moduleLoadPrefix
+			ms3.exes = "xxhsum\nxxh32sum\nxxh64sum\nxxh128sum\n"
+
+			err := builder.Build(def)
+			So(err, ShouldBeNil)
+
+			ok := waitFor(func() bool {
+				return logWriter.String() != ""
+			})
+			So(ok, ShouldBeTrue)
+
+			expectedLog := "Post \\\"http://0.0.0.0:1234?groups%2Fhgi%2Fxxhash-0.8.1\\\"" +
+				": dial tcp 0.0.0.0:1234: connect: connection refused"
+			So(logWriter.String(), ShouldContainSubstring, expectedLog)
+
+			conf.CoreURL = msc.URL
+			mc.err = Error("an error")
+
+			logWriter.Reset()
+			mwr.ch = make(chan struct{})
+			conf.Module.ModuleInstallDir = t.TempDir()
+			conf.Module.ScriptsInstallDir = t.TempDir()
+
+			err = builder.Build(def)
+			So(err, ShouldBeNil)
+
+			ok = waitFor(func() bool {
+				return logWriter.String() != ""
+			})
+			So(ok, ShouldBeTrue)
+
+			expectedLog = "\"Async part of build failed\" err=\"an error\\n\""
+
+			So(logWriter.String(), ShouldContainSubstring, expectedLog)
 		})
 	})
 }
