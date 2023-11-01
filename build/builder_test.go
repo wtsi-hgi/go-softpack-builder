@@ -284,8 +284,11 @@ EOF
 	spack buildcache keys --install --trust
 	spack config add "config:install_tree:padded_length:128"
 	spack -e . concretize
-	spack -e . install
-	spack -e . buildcache push -a --rebuild-index -f s3cache
+	spack -e . install --fail-fast || {
+		spack -e . buildcache push -a --rebuild-index s3cache
+		false
+	}
+	spack -e . buildcache push -a --rebuild-index s3cache
 	spack gc -y
 	spack env activate --sh -d . >> /opt/spack-environment/environment_modifications.sh
 
@@ -296,14 +299,14 @@ EOF
 	grep 'x-executable\|x-archive\|x-sharedlib' | \
 	awk -F: '{print $1}' | xargs strip
 
-	exes="$(find $(grep "^export PATH=" /opt/spack-environment/environment_modifications.sh | sed -e 's/^export PATH=//' -e 's/;$//' | tr ":" "\n" | grep /opt/view | tr "\n" " ") -maxdepth 1 -executable -type l | xargs -r -L 1 readlink)";
+	exes="$(find $(grep "^export PATH=" /opt/spack-environment/environment_modifications.sh | sed -e 's/^export PATH=//' -e 's/;$//' | tr ":" "\n" | grep /opt/view | tr "\n" " ") -maxdepth 1 -executable -type l | xargs -r -L 1 readlink)"
 	{
 		for pkg in "xxhash" "r-seurat" "py-anndata"; do
-			echo "$exes" | grep "/linux-[^/]*/gcc-[^/]*/$pkg-" || true;
-		done | xargs -L 1 -r basename;
-		echo "R";
-		echo "Rscript";
-		echo "python";
+			echo "$exes" | grep "/linux-[^/]*/gcc-[^/]*/$pkg-" || true
+		done | xargs -L 1 -r basename
+		echo "R"
+		echo "Rscript"
+		echo "python"
 	} | sort | uniq > executables
 
 Bootstrap: docker
