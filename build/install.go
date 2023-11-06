@@ -30,10 +30,11 @@ import (
 )
 
 const (
-	imageBasename    = "singularity.sif"
-	scriptsDirSuffix = "-scripts"
-	perms            = 0755
-	flags            = os.O_EXCL | os.O_CREATE | os.O_WRONLY
+	ScriptsDirSuffix = "-scripts"
+
+	imageBasename = "singularity.sif"
+	perms         = 0755
+	flags         = os.O_EXCL | os.O_CREATE | os.O_WRONLY
 )
 
 func installModule(scriptInstallBase, moduleInstallBase string, def *Definition, module,
@@ -67,7 +68,7 @@ func installModule(scriptInstallBase, moduleInstallBase string, def *Definition,
 
 func makeModuleDirs(scriptInstallBase, moduleInstallBase string, def *Definition) (string, string, error) {
 	scriptsDir := filepath.Join(scriptInstallBase, def.EnvironmentPath,
-		def.EnvironmentName, def.EnvironmentVersion+scriptsDirSuffix)
+		def.EnvironmentName, def.EnvironmentVersion+ScriptsDirSuffix)
 	moduleDir := filepath.Join(moduleInstallBase, def.EnvironmentPath, def.EnvironmentName)
 
 	if err := makeDirectory(scriptsDir, scriptInstallBase); err != nil {

@@ -369,7 +369,7 @@ Stage: final
 			modulePath := filepath.Join(conf.Module.ModuleInstallDir,
 				def.EnvironmentPath, def.EnvironmentName, def.EnvironmentVersion)
 			scriptsPath := filepath.Join(conf.Module.ScriptsInstallDir,
-				def.EnvironmentPath, def.EnvironmentName, def.EnvironmentVersion+scriptsDirSuffix)
+				def.EnvironmentPath, def.EnvironmentName, def.EnvironmentVersion+ScriptsDirSuffix)
 			imagePath := filepath.Join(scriptsPath, imageBasename)
 			expectedExes := []string{"python", "R", "Rscript", "xxhsum", "xxh32sum", "xxh64sum", "xxh128sum"}
 
@@ -535,7 +535,7 @@ packages:
 			})
 			So(ok, ShouldBeTrue)
 
-			expectedLog := "Post \\\"http://0.0.0.0:1234?groups%2Fhgi%2Fxxhash-0.8.1\\\"" +
+			expectedLog := "Post \\\"http://0.0.0.0:1234" + uploadEndpoint + "?groups%2Fhgi%2Fxxhash-0.8.1\\\"" +
 				": dial tcp 0.0.0.0:1234: connect: connection refused"
 			So(logWriter.String(), ShouldContainSubstring, expectedLog)
 

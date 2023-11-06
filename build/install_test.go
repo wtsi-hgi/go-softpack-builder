@@ -54,7 +54,7 @@ func TestInstall(t *testing.T) {
 		createdModuleFile := readFile(t, filepath.Join(tmpModulesDir, def.EnvironmentPath,
 			def.EnvironmentName, def.EnvironmentVersion))
 		scriptsDir := filepath.Join(tmpScriptsDir, def.EnvironmentPath, def.EnvironmentName,
-			def.EnvironmentVersion+scriptsDirSuffix)
+			def.EnvironmentVersion+ScriptsDirSuffix)
 		createdImageFile := readFile(t, filepath.Join(scriptsDir, imageBasename))
 
 		So(createdModuleFile, ShouldEqual, moduleFile)

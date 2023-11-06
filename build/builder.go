@@ -52,6 +52,8 @@ const (
 	builderOut             = "builder.out"
 	moduleForCoreBasename  = "module"
 	usageBasename          = "README.md"
+
+	uploadEndpoint = "/upload"
 )
 
 //go:embed singularity.tmpl
@@ -541,7 +543,7 @@ func (b *Builder) addArtifactsToRepo(artifacts map[string]io.Reader, envPath str
 
 	defer pw.Close()
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, b.config.CoreURL+"?"+url.QueryEscape(envPath), pr)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, b.config.CoreURL+uploadEndpoint+"?"+url.QueryEscape(envPath), pr)
 	if err != nil {
 		return err
 	}
@@ -549,7 +551,7 @@ func (b *Builder) addArtifactsToRepo(artifacts map[string]io.Reader, envPath str
 	req.Header.Add("Content-Type", writer.FormDataContentType())
 
 	resp, err := http.DefaultClient.Do(req)
-	slog.Debug("addArtifactsToRepo", "url", b.config.CoreURL+"?"+url.QueryEscape(envPath), "err", err)
+	slog.Debug("addArtifactsToRepo", "url", b.config.CoreURL+uploadEndpoint+"?"+url.QueryEscape(envPath), "err", err)
 
 	if err != nil {
 		return err
