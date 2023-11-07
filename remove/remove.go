@@ -30,14 +30,14 @@ const graphQLDeleteEnvironment = `mutation ($name: String!, $envPath: String!) {
 			name: $name
 			path: $envPath
 	) {
-			... on DeleteEnvironmentSuccess {
-					message
-			}
-			... on EnvironmentNotFoundError {
-					message
-					path
-					name
-			}
+		... on DeleteEnvironmentSuccess {
+				message
+		}
+		... on EnvironmentNotFoundError {
+				message
+				path
+				name
+		}
 	}
 }`
 
