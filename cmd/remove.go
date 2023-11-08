@@ -3,6 +3,7 @@ package cmd
 import (
 	"github.com/spf13/cobra"
 	"github.com/wtsi-hgi/go-softpack-builder/remove"
+	"github.com/wtsi-hgi/go-softpack-builder/s3"
 )
 
 var removeCmd = &cobra.Command{
@@ -27,7 +28,12 @@ module files and the singularity image and symlinks.`,
 
 		conf := getConfig()
 
-		if err := remove.Remove(conf, args[1], args[2]); err != nil {
+		s, err := s3.New(conf.S3.BuildBase)
+		if err != nil {
+			die(err.Error())
+		}
+
+		if err := remove.Remove(conf, s, args[1], args[2]); err != nil {
 			die(err.Error())
 		}
 	},

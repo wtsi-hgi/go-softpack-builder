@@ -21,6 +21,12 @@ const (
 	singularityImage = "singularity.sif"
 )
 
+type mockS3 struct{}
+
+func (mockS3) RemoveFile(_ string) error {
+	return nil
+}
+
 func TestRemove(t *testing.T) {
 	Convey("With a valid config and a test environment to be removed", t, func() {
 		conf, group, env, version := createTestEnv(t)
@@ -35,6 +41,8 @@ func TestRemove(t *testing.T) {
 
 		conf.CoreURL = core.URL
 
+		s3Mock := new(mockS3)
+
 		Convey("Remove() call fails if the environments module dir or script dir is not removable", func() {
 			for _, p := range [...]string{
 				filepath.Join(conf.Module.ModuleInstallDir, groupsDir, group),
@@ -46,7 +54,7 @@ func TestRemove(t *testing.T) {
 				err := os.Chmod(p, 0)
 				So(err, ShouldBeNil)
 
-				err = Remove(conf, envPath, version)
+				err = Remove(conf, s3Mock, envPath, version)
 				So(err, ShouldNotBeNil)
 				So(err.Error(), ShouldEqual, "no write access to dir ("+p+"): permission denied")
 
@@ -65,7 +73,7 @@ func TestRemove(t *testing.T) {
 			err = os.RemoveAll(removing)
 			So(err, ShouldBeNil)
 
-			err = Remove(conf, envPath, version)
+			err = Remove(conf, s3Mock, envPath, version)
 			So(err, ShouldNotBeNil)
 			So(err.Error(), ShouldEqual, "no write access to dir ("+removing+"): no such file or directory")
 
@@ -78,13 +86,13 @@ func TestRemove(t *testing.T) {
 			response.Path = filepath.Join(groupsDir, group)
 			response.Name = env + "-" + version
 
-			err := Remove(conf, envPath, version)
+			err := Remove(conf, s3Mock, envPath, version)
 			So(err, ShouldNotBeNil)
 			So(err.Error(), ShouldEqual, "No environment with this name found in this location.")
 
 			conf.CoreURL = "http://invalid-url:1234/"
 
-			err = Remove(conf, envPath, version)
+			err = Remove(conf, s3Mock, envPath, version)
 			So(err, ShouldNotBeNil)
 		})
 
@@ -94,7 +102,7 @@ func TestRemove(t *testing.T) {
 			modulePath := filepath.Join(conf.Module.ModuleInstallDir, groupsDir, group, env)
 			scriptsPath := filepath.Join(conf.Module.ScriptsInstallDir, groupsDir, group, env, version+build.ScriptsDirSuffix)
 
-			err := Remove(conf, envPath, version)
+			err := Remove(conf, s3Mock, envPath, version)
 			So(err, ShouldBeNil)
 
 			_, err = os.Stat(modulePath)

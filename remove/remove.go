@@ -3,6 +3,7 @@ package remove
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -23,6 +24,10 @@ type coreResponse struct {
 	Message string `json:"message,omitempty"`
 	Path    string `json:"path,omitempty"`
 	Name    string `json:"name,omitempty"`
+}
+
+type S3Remover interface {
+	RemoveFile(string) error
 }
 
 const graphQLDeleteEnvironment = `mutation ($name: String!, $envPath: String!) {
@@ -51,7 +56,7 @@ type graphQLDeleteEnvironmentMutation struct {
 	} `json:"variables"`
 }
 
-func Remove(conf *config.Config, envPath, version string) error {
+func Remove(conf *config.Config, s S3Remover, envPath, version string) error {
 	envPath = filepath.Clean(string(filepath.Separator) + envPath)[1:]
 
 	modulePath := filepath.Join(conf.Module.ModuleInstallDir, envPath)
@@ -66,6 +71,10 @@ func Remove(conf *config.Config, envPath, version string) error {
 	}
 
 	if err := removeLocalFiles(modulePath, scriptPath); err != nil {
+		return err
+	}
+
+	if err := removeFromS3(s, modulePath); err != nil {
 		return err
 	}
 
@@ -134,6 +143,18 @@ func removeLocalFiles(modulePath, scriptPath string) error {
 	err = os.RemoveAll(scriptPath)
 	if err != nil {
 		return err
+	}
+
+	return nil
+}
+
+var files = [...]string{"build.out", "singularity.def", "singularity.sif", "executables"}
+
+func removeFromS3(s S3Remover, path string) error {
+	for _, file := range files {
+		if err := s.RemoveFile(filepath.Join(path, file)); err != nil && !errors.Is(err, os.ErrNotExist) {
+			return err
+		}
 	}
 
 	return nil
