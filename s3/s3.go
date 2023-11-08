@@ -24,9 +24,12 @@
 package s3
 
 import (
+	"errors"
 	"io"
+	"os"
 
 	"github.com/VertebrateResequencing/muxfys"
+	"github.com/minio/minio-go"
 )
 
 // S3 lets you upload data to S3 and retrieve it.
@@ -64,4 +67,17 @@ func (s *S3) OpenFile(source string) (io.ReadCloser, error) {
 	source = s.RemotePath(source)
 
 	return s.S3Accessor.OpenFile(source, 0)
+}
+
+func (s *S3) RemoveFile(path string) error {
+	if err := s.S3Accessor.DeleteFile(path); err != nil {
+		var errr minio.ErrorResponse
+		if errors.As(err, &errr) && errr.Code == "NoSuchKey" {
+			return os.ErrNotExist
+		}
+
+		return err
+	}
+
+	return nil
 }

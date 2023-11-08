@@ -71,6 +71,16 @@ func TestS3(t *testing.T) {
 				So(err, ShouldBeNil)
 				So(string(buf), ShouldEqual, testData)
 			})
+
+			Convey("And remove it", func() {
+				err := s3.RemoveFile(basename)
+				So(err, ShouldBeNil)
+
+				Convey("Removing it again should return ErrNotFound", func() {
+					err := s3.RemoveFile(basename)
+					So(err, ShouldEqual, os.ErrNotExist)
+				})
+			})
 		})
 	})
 }
