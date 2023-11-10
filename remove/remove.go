@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/wtsi-hgi/go-softpack-builder/build"
 	"github.com/wtsi-hgi/go-softpack-builder/config"
@@ -102,6 +103,8 @@ func checkWriteAccess(modulePath, scriptPath string) error {
 }
 
 func removeEnvFromCore(conf *config.Config, envPath string) error {
+	fmt.Printf("Removing env %s from core\n", envPath)
+
 	variables := graphQLDeleteEnvironmentVariables{
 		Name:    filepath.Base(envPath),
 		EnvPath: filepath.Dir(envPath),
@@ -113,7 +116,7 @@ func removeEnvFromCore(conf *config.Config, envPath string) error {
 
 	mutation := graphQLDeleteEnvironmentMutation{
 		Query:     graphQLDeleteEnvironment,
-		Variables: buf.String(),
+		Variables: strings.TrimSpace(buf.String()),
 	}
 
 	buf.Reset()
@@ -166,7 +169,11 @@ func removeAllNoDescend(path string) error {
 	}
 
 	for _, file := range files {
-		if err := os.Remove(filepath.Join(path, file.Name())); err != nil {
+		toRemove := filepath.Join(path, file.Name())
+
+		fmt.Printf("Removing file: %s\n", toRemove)
+
+		if err := os.Remove(toRemove); err != nil {
 			return err
 		}
 	}
@@ -178,7 +185,11 @@ var files = [...]string{"build.out", "singularity.def", "singularity.sif", "exec
 
 func removeFromS3(s S3Remover, path string) error {
 	for _, file := range files {
-		if err := s.RemoveFile(filepath.Join(path, file)); err != nil && !errors.Is(err, os.ErrNotExist) {
+		toRemove := filepath.Join(path, file)
+
+		fmt.Printf("Removing file from S3: %s\n", toRemove)
+
+		if err := s.RemoveFile(toRemove); err != nil && !errors.Is(err, os.ErrNotExist) {
 			return err
 		}
 	}
