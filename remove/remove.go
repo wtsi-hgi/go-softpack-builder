@@ -146,17 +146,32 @@ func removeEnvFromCore(conf *config.Config, envPath string) error {
 }
 
 func removeLocalFiles(modulePath, scriptPath string) error {
-	err := os.RemoveAll(modulePath)
+	err := removeAllNoDescend(modulePath)
 	if err != nil {
 		return err
 	}
 
-	err = os.RemoveAll(scriptPath)
+	err = removeAllNoDescend(scriptPath)
 	if err != nil {
 		return err
 	}
 
 	return nil
+}
+
+func removeAllNoDescend(path string) error {
+	files, err := os.ReadDir(path)
+	if err != nil {
+		return err
+	}
+
+	for _, file := range files {
+		if err := os.Remove(filepath.Join(path, file.Name())); err != nil {
+			return err
+		}
+	}
+
+	return os.Remove(path)
 }
 
 var files = [...]string{"build.out", "singularity.def", "singularity.sif", "executables"}
