@@ -21,11 +21,13 @@ module files and the singularity image and symlinks.`,
 			die("require a environment path")
 		}
 
-		if len(args) < 2 {
+		const maxArgs = 2
+
+		if len(args) < maxArgs {
 			die("require a environment version")
 		}
 
-		if len(args) != 2 {
+		if len(args) != maxArgs {
 			die("unexpected arguments")
 		}
 

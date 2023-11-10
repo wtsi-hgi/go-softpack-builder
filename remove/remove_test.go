@@ -36,7 +36,7 @@ func TestRemove(t *testing.T) {
 		var response coreResponse
 
 		core := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-			json.NewEncoder(w).Encode(response)
+			json.NewEncoder(w).Encode(response) //nolint:errcheck
 		}))
 
 		conf.CoreURL = core.URL
@@ -65,7 +65,8 @@ func TestRemove(t *testing.T) {
 			_, err := os.Stat(filepath.Join(conf.Module.ModuleInstallDir, groupsDir, group, env, version))
 			So(err, ShouldBeNil)
 
-			_, err = os.Stat(filepath.Join(conf.Module.ScriptsInstallDir, groupsDir, group, env, version+build.ScriptsDirSuffix, singularityImage))
+			_, err = os.Stat(filepath.Join(conf.Module.ScriptsInstallDir, groupsDir,
+				group, env, version+build.ScriptsDirSuffix, singularityImage))
 			So(err, ShouldBeNil)
 
 			removing := filepath.Join(conf.Module.ModuleInstallDir, groupsDir, group, env)
@@ -100,7 +101,8 @@ func TestRemove(t *testing.T) {
 			response.Data.DeleteEnvironment.Message = "Successfully deleted the environment"
 
 			modulePath := filepath.Join(conf.Module.ModuleInstallDir, groupsDir, group, env)
-			scriptsPath := filepath.Join(conf.Module.ScriptsInstallDir, groupsDir, group, env, version+build.ScriptsDirSuffix)
+			scriptsPath := filepath.Join(conf.Module.ScriptsInstallDir, groupsDir, group,
+				env, version+build.ScriptsDirSuffix)
 
 			err := Remove(conf, s3Mock, envPath, version)
 			So(err, ShouldBeNil)
@@ -115,6 +117,8 @@ func TestRemove(t *testing.T) {
 }
 
 func createTestEnv(t *testing.T) (*config.Config, string, string, string) {
+	t.Helper()
+
 	conf := new(config.Config)
 	conf.Module.ModuleInstallDir = t.TempDir()
 	conf.Module.ScriptsInstallDir = t.TempDir()

@@ -2,9 +2,12 @@ package remove
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -103,8 +106,29 @@ func checkWriteAccess(modulePath, scriptPath string) error {
 }
 
 func removeEnvFromCore(conf *config.Config, envPath string) error {
-	fmt.Printf("Removing env %s from core\n", envPath)
+	log.Printf("Removing env %s from core\n", envPath)
 
+	req, err := http.NewRequestWithContext(
+		context.Background(),
+		http.MethodPost,
+		strings.TrimSuffix(conf.CoreURL, "/")+graphQLEndpoint,
+		createGraphQLPacket(envPath),
+	)
+	if err != nil {
+		return err
+	}
+
+	req.Header.Add("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+
+	return handleCoreResponse(resp)
+}
+
+func createGraphQLPacket(envPath string) io.Reader {
 	mutation := graphQLDeleteEnvironmentMutation{
 		Query: graphQLDeleteEnvironment,
 	}
@@ -113,22 +137,15 @@ func removeEnvFromCore(conf *config.Config, envPath string) error {
 
 	var buf bytes.Buffer
 
-	json.NewEncoder(&buf).Encode(mutation)
+	json.NewEncoder(&buf).Encode(mutation) //nolint:errcheck
 
-	req, err := http.NewRequest(http.MethodPost, strings.TrimSuffix(conf.CoreURL, "/")+graphQLEndpoint, &buf)
-	if err != nil {
-		return err
-	}
-	req.Header.Add("Content-Type", "application/json")
+	return &buf
+}
 
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return err
-	}
-
+func handleCoreResponse(resp *http.Response) error {
 	var cr coreResponse
 
-	err = json.NewDecoder(resp.Body).Decode(&cr)
+	err := json.NewDecoder(resp.Body).Decode(&cr)
 	if err != nil {
 		return err
 	}
@@ -141,17 +158,11 @@ func removeEnvFromCore(conf *config.Config, envPath string) error {
 }
 
 func removeLocalFiles(modulePath, scriptPath string) error {
-	err := removeAllNoDescend(modulePath)
-	if err != nil {
+	if err := removeAllNoDescend(modulePath); err != nil {
 		return err
 	}
 
-	err = removeAllNoDescend(scriptPath)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return removeAllNoDescend(scriptPath)
 }
 
 func removeAllNoDescend(path string) error {
@@ -163,25 +174,25 @@ func removeAllNoDescend(path string) error {
 	for _, file := range files {
 		toRemove := filepath.Join(path, file.Name())
 
-		fmt.Printf("Removing file: %s\n", toRemove)
+		log.Printf("Removing file: %s\n", toRemove)
 
 		if err := os.Remove(toRemove); err != nil {
 			return err
 		}
 	}
 
-	fmt.Printf("Removing directory: %s\n", path)
+	log.Printf("Removing directory: %s\n", path)
 
 	return os.Remove(path)
 }
 
-var files = [...]string{"build.out", "singularity.def", "singularity.sif", "executables"}
+var files = [...]string{"build.out", "singularity.def", "singularity.sif", "executables"} //nolint:gochecknoglobals
 
 func removeFromS3(s S3Remover, path string) error {
 	for _, file := range files {
 		toRemove := filepath.Join(path, file)
 
-		fmt.Printf("Removing file from S3: %s\n", toRemove)
+		log.Printf("Removing file from S3: %s\n", toRemove)
 
 		if err := s.RemoveFile(toRemove); err != nil && !errors.Is(err, os.ErrNotExist) {
 			return err
