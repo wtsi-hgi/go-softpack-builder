@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/wtsi-hgi/go-softpack-builder/build"
 	"github.com/wtsi-hgi/go-softpack-builder/config"
@@ -114,7 +115,7 @@ func removeEnvFromCore(conf *config.Config, envPath string) error {
 
 	json.NewEncoder(&buf).Encode(mutation)
 
-	req, err := http.NewRequest(http.MethodPost, conf.CoreURL+graphQLEndpoint, &buf)
+	req, err := http.NewRequest(http.MethodPost, strings.TrimSuffix(conf.CoreURL, "/")+graphQLEndpoint, &buf)
 	if err != nil {
 		return err
 	}
