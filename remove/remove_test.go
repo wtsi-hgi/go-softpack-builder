@@ -159,7 +159,7 @@ func genRandString(length int) string {
 	sb.Grow(length)
 
 	for ; length > 0; length-- {
-		letter := rand.Intn(52)
+		letter := rand.Intn(52) //nolint:gosec
 
 		if letter < 26 {
 			sb.WriteByte(byte(letter) + 'A')

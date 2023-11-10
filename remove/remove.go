@@ -57,7 +57,7 @@ const graphQLDeleteEnvironment = `mutation ($name: String!, $envPath: String!) {
 const graphQLEndpoint = "/graphql"
 
 type graphQLDeleteEnvironmentMutation struct {
-	Query     string `json:"query"` //graphQLDeleteEnvironment
+	Query     string `json:"query"` // graphQLDeleteEnvironment
 	Variables struct {
 		Name    string `json:"name"`
 		EnvPath string `json:"envPath"`
@@ -82,11 +82,7 @@ func Remove(conf *config.Config, s S3Remover, envPath, version string) error {
 		return err
 	}
 
-	if err := removeFromS3(s, modulePath); err != nil {
-		return err
-	}
-
-	return nil
+	return removeFromS3(s, modulePath)
 }
 
 func checkWriteAccess(modulePath, scriptPath string) error {

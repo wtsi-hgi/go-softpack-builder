@@ -71,13 +71,13 @@ func (s *S3) OpenFile(source string) (io.ReadCloser, error) {
 
 func (s *S3) RemoveFile(path string) error {
 	path = s.RemotePath(path)
-	if err := s.S3Accessor.DeleteFile(path); err != nil {
+
+	err := s.S3Accessor.DeleteFile(path)
+	if err != nil {
 		var errr minio.ErrorResponse
 		if errors.As(err, &errr) && errr.Code == "NoSuchKey" {
 			return os.ErrNotExist
 		}
-
-		return err
 	}
 
 	return nil
