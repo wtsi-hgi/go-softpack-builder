@@ -79,19 +79,19 @@ func (m *mockS3) UploadData(data io.Reader, dest string) error {
 }
 
 func (m *mockS3) OpenFile(source string) (io.ReadCloser, error) {
-	if filepath.Base(source) == exesBasename {
+	if filepath.Base(source) == ExesBasename {
 		return io.NopCloser(strings.NewReader(m.exes)), nil
 	}
 
-	if filepath.Base(source) == builderOut {
+	if filepath.Base(source) == BuilderOut {
 		return io.NopCloser(strings.NewReader("output")), nil
 	}
 
-	if filepath.Base(source) == spackLock {
+	if filepath.Base(source) == SpackLockFile {
 		return io.NopCloser(strings.NewReader(`{"_meta":{"file-type":"spack-lockfile","lockfile-version":5,"specfile-version":4},"spack":{"version":"0.21.0.dev0","type":"git","commit":"dac3b453879439fd733b03d0106cc6fe070f71f6"},"roots":[{"hash":"oibd5a4hphfkgshqiav4fdkvw4hsq4ek","spec":"xxhash arch=None-None-x86_64_v3"}, {"hash":"1ibd5a4hphfkgshqiav4fdkvw4hsq4e1","spec":"py-anndata arch=None-None-x86_64_v3"}, {"hash":"2ibd5a4hphfkgshqiav4fdkvw4hsq4e2","spec":"r-seurat arch=None-None-x86_64_v3"}],"concrete_specs":{"oibd5a4hphfkgshqiav4fdkvw4hsq4ek":{"name":"xxhash","version":"0.8.1","arch":{"platform":"linux","platform_os":"ubuntu22.04","target":"x86_64_v3"},"compiler":{"name":"gcc","version":"11.4.0"},"namespace":"builtin","parameters":{"build_system":"makefile","cflags":[],"cppflags":[],"cxxflags":[],"fflags":[],"ldflags":[],"ldlibs":[]},"package_hash":"wuj5b2kjnmrzhtjszqovcvgc3q46m6hoehmiccimi5fs7nmsw22a====","hash":"oibd5a4hphfkgshqiav4fdkvw4hsq4ek"},"2ibd5a4hphfkgshqiav4fdkvw4hsq4e2":{"name":"r-seurat","version":"4","arch":{"platform":"linux","platform_os":"ubuntu22.04","target":"x86_64_v3"},"compiler":{"name":"gcc","version":"11.4.0"},"namespace":"builtin","parameters":{"build_system":"makefile","cflags":[],"cppflags":[],"cxxflags":[],"fflags":[],"ldflags":[],"ldlibs":[]},"package_hash":"2uj5b2kjnmrzhtjszqovcvgc3q46m6hoehmiccimi5fs7nmsw222====","hash":"2ibd5a4hphfkgshqiav4fdkvw4hsq4e2"}, "1ibd5a4hphfkgshqiav4fdkvw4hsq4e1":{"name":"py-anndata","version":"3.14","arch":{"platform":"linux","platform_os":"ubuntu22.04","target":"x86_64_v3"},"compiler":{"name":"gcc","version":"11.4.0"},"namespace":"builtin","parameters":{"build_system":"makefile","cflags":[],"cppflags":[],"cxxflags":[],"fflags":[],"ldflags":[],"ldlibs":[]},"package_hash":"2uj5b2kjnmrzhtjszqovcvgc3q46m6hoehmiccimi5fs7nmsw222====","hash":"1ibd5a4hphfkgshqiav4fdkvw4hsq4e1"}}}`)), nil //nolint:lll
 	}
 
-	if filepath.Base(source) == imageBasename {
+	if filepath.Base(source) == ImageBasename {
 		return io.NopCloser(strings.NewReader("image")), nil
 	}
 
@@ -370,7 +370,7 @@ Stage: final
 				def.EnvironmentPath, def.EnvironmentName, def.EnvironmentVersion)
 			scriptsPath := filepath.Join(conf.Module.ScriptsInstallDir,
 				def.EnvironmentPath, def.EnvironmentName, def.EnvironmentVersion+ScriptsDirSuffix)
-			imagePath := filepath.Join(scriptsPath, imageBasename)
+			imagePath := filepath.Join(scriptsPath, ImageBasename)
 			expectedExes := []string{"python", "R", "Rscript", "xxhsum", "xxh32sum", "xxh64sum", "xxh128sum"}
 
 			expectedFiles := []string{modulePath, scriptsPath, imagePath}
@@ -451,19 +451,19 @@ packages:
 			expectedReadmeContent := "module load " + moduleLoadPrefix + "/groups/hgi/xxhash/0.8.1"
 
 			for file, expectedData := range map[string]string{
-				softpackYaml:           expectedSoftpackYaml,
+				SoftpackYaml:           expectedSoftpackYaml,
 				moduleForCoreBasename:  "module-whatis",
-				singularityDefBasename: "specs:\n  - xxhash@0.8.1 arch=None-None-x86_64_v4",
-				spackLock:              `"concrete_specs":`,
-				builderOut:             "output",
-				usageBasename:          expectedReadmeContent,
+				SingularityDefBasename: "specs:\n  - xxhash@0.8.1 arch=None-None-x86_64_v4",
+				SpackLockFile:          `"concrete_specs":`,
+				BuilderOut:             "output",
+				UsageBasename:          expectedReadmeContent,
 			} {
 				data, okg := mc.getFile("groups/hgi/xxhash-0.8.1/" + file)
 				So(okg, ShouldBeTrue)
 				So(data, ShouldContainSubstring, expectedData)
 			}
 
-			_, ok = mc.getFile("groups/hgi/xxhash-0.8.1/" + imageBasename)
+			_, ok = mc.getFile("groups/hgi/xxhash-0.8.1/" + ImageBasename)
 			So(ok, ShouldBeFalse)
 
 			So(ms3.softpackYML, ShouldEqual, expectedSoftpackYaml)
@@ -491,7 +491,7 @@ packages:
 			So(logWriter.String(), ShouldContainSubstring,
 				"msg=\"Async part of build failed\" err=\"Mock error\" s3Path=some_path/groups/hgi/xxhash/0.8.1")
 
-			data, ok := mc.getFile("groups/hgi/xxhash-0.8.1/" + builderOut)
+			data, ok := mc.getFile("groups/hgi/xxhash-0.8.1/" + BuilderOut)
 			So(ok, ShouldBeTrue)
 			So(data, ShouldContainSubstring, "output")
 		})

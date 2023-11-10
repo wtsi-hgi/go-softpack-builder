@@ -45,13 +45,13 @@ import (
 )
 
 const (
-	singularityDefBasename = "singularity.def"
-	exesBasename           = "executables"
-	softpackYaml           = "softpack.yml"
-	spackLock              = "spack.lock"
-	builderOut             = "builder.out"
+	SingularityDefBasename = "singularity.def"
+	ExesBasename           = "executables"
+	SoftpackYaml           = "softpack.yml"
+	SpackLockFile          = "spack.lock"
+	BuilderOut             = "builder.out"
 	moduleForCoreBasename  = "module"
-	usageBasename          = "README.md"
+	UsageBasename          = "README.md"
 
 	uploadEndpoint = "/upload"
 )
@@ -287,7 +287,7 @@ func (b *Builder) generateAndUploadSingularityDef(def *Definition, s3Path string
 		return "", err
 	}
 
-	singDefUploadPath := filepath.Join(s3Path, singularityDefBasename)
+	singDefUploadPath := filepath.Join(s3Path, SingularityDefBasename)
 
 	err = b.s3.UploadData(strings.NewReader(singDef), singDefUploadPath)
 
@@ -350,7 +350,7 @@ func (b *Builder) asyncBuild(def *Definition, wrInput, s3Path, singDef string) e
 }
 
 func (b *Builder) addLogToRepo(s3Path, environmentPath string) {
-	log, err := b.s3.OpenFile(filepath.Join(s3Path, builderOut))
+	log, err := b.s3.OpenFile(filepath.Join(s3Path, BuilderOut))
 	if err != nil {
 		slog.Error("error getting build log file", "err", err)
 
@@ -358,14 +358,14 @@ func (b *Builder) addLogToRepo(s3Path, environmentPath string) {
 	}
 
 	if err := b.addArtifactsToRepo(map[string]io.Reader{
-		builderOut: log,
+		BuilderOut: log,
 	}, environmentPath); err != nil {
 		slog.Error("error sending build log file to core", "err", err)
 	}
 }
 
 func (b *Builder) getExes(s3Path string) ([]string, error) {
-	exeData, err := b.s3.OpenFile(filepath.Join(s3Path, exesBasename))
+	exeData, err := b.s3.OpenFile(filepath.Join(s3Path, ExesBasename))
 	if err != nil {
 		return nil, err
 	}
@@ -380,7 +380,7 @@ func (b *Builder) getExes(s3Path string) ([]string, error) {
 
 func (b *Builder) prepareAndInstallArtifacts(def *Definition, s3Path,
 	moduleFileData string, exes []string) error {
-	imageData, err := b.s3.OpenFile(filepath.Join(s3Path, imageBasename))
+	imageData, err := b.s3.OpenFile(filepath.Join(s3Path, ImageBasename))
 	if err != nil {
 		return err
 	}
@@ -410,24 +410,24 @@ func (b *Builder) prepareArtifactsFromS3AndSendToCoreAndS3(def *Definition, s3Pa
 
 	return b.addArtifactsToRepo(
 		map[string]io.Reader{
-			spackLock:              bytes.NewReader(lockData),
-			softpackYaml:           strings.NewReader(concreteSpackYAMLFile),
-			singularityDefBasename: strings.NewReader(singDef),
-			builderOut:             logData,
+			SpackLockFile:          bytes.NewReader(lockData),
+			SoftpackYaml:           strings.NewReader(concreteSpackYAMLFile),
+			SingularityDefBasename: strings.NewReader(singDef),
+			BuilderOut:             logData,
 			moduleForCoreBasename:  strings.NewReader(moduleFileData),
-			usageBasename:          strings.NewReader(readme),
+			UsageBasename:          strings.NewReader(readme),
 		},
 		def.FullEnvironmentPath(),
 	)
 }
 
 func (b *Builder) getArtifactDataFromS3(s3Path string) (io.Reader, []byte, error) {
-	logData, err := b.s3.OpenFile(filepath.Join(s3Path, builderOut))
+	logData, err := b.s3.OpenFile(filepath.Join(s3Path, BuilderOut))
 	if err != nil {
 		return nil, nil, err
 	}
 
-	lockFile, err := b.s3.OpenFile(filepath.Join(s3Path, spackLock))
+	lockFile, err := b.s3.OpenFile(filepath.Join(s3Path, SpackLockFile))
 	if err != nil {
 		return nil, nil, err
 	}
@@ -448,7 +448,7 @@ func (b *Builder) generateAndUploadSpackYAML(lockData []byte, description string
 	}
 
 	if err = b.s3.UploadData(strings.NewReader(concreteSpackYAMLFile),
-		filepath.Join(s3Path, softpackYaml)); err != nil {
+		filepath.Join(s3Path, SoftpackYaml)); err != nil {
 		return "", err
 	}
 
@@ -522,7 +522,7 @@ func SpackLockToSoftPackYML(spackLockData []byte, desc string, exes []string) (s
 func (b *Builder) generateAndUploadUsageFile(def *Definition, s3Path string) (string, error) {
 	readme := def.ModuleUsage(b.config.Module.LoadPath)
 
-	if err := b.s3.UploadData(strings.NewReader(readme), filepath.Join(s3Path, usageBasename)); err != nil {
+	if err := b.s3.UploadData(strings.NewReader(readme), filepath.Join(s3Path, UsageBasename)); err != nil {
 		return "", err
 	}
 

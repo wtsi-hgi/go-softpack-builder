@@ -32,7 +32,7 @@ import (
 const (
 	ScriptsDirSuffix = "-scripts"
 
-	imageBasename = "singularity.sif"
+	ImageBasename = "singularity.sif"
 	perms         = 0755
 	flags         = os.O_EXCL | os.O_CREATE | os.O_WRONLY
 )
@@ -59,7 +59,7 @@ func installModule(scriptInstallBase, moduleInstallBase string, def *Definition,
 		return err
 	}
 
-	if err = installFile(image, filepath.Join(scriptsDir, imageBasename)); err != nil {
+	if err = installFile(image, filepath.Join(scriptsDir, ImageBasename)); err != nil {
 		return err
 	}
 
@@ -67,9 +67,9 @@ func installModule(scriptInstallBase, moduleInstallBase string, def *Definition,
 }
 
 func makeModuleDirs(scriptInstallBase, moduleInstallBase string, def *Definition) (string, string, error) {
-	scriptsDir := filepath.Join(scriptInstallBase, def.EnvironmentPath,
-		def.EnvironmentName, def.EnvironmentVersion+ScriptsDirSuffix)
-	moduleDir := filepath.Join(moduleInstallBase, def.EnvironmentPath, def.EnvironmentName)
+	scriptsDir := ScriptsDirFromNameAndVersion(scriptInstallBase, def.EnvironmentPath,
+		def.EnvironmentName, def.EnvironmentVersion)
+	moduleDir := ModuleDirFromName(moduleInstallBase, def.EnvironmentPath, def.EnvironmentName)
 
 	if err := makeDirectory(scriptsDir, scriptInstallBase); err != nil {
 		return "", "", err
@@ -80,6 +80,18 @@ func makeModuleDirs(scriptInstallBase, moduleInstallBase string, def *Definition
 	}
 
 	return scriptsDir, moduleDir, nil
+}
+
+// ScriptsDirFromNameAndVersion returns the canonical scripts path for an
+// environment.
+func ScriptsDirFromNameAndVersion(scriptInstallBase, path, name, version string) string {
+	return filepath.Join(scriptInstallBase, path,
+		name, version+ScriptsDirSuffix)
+}
+
+// ModuleDirFromName returns the canonical module path for an environment.
+func ModuleDirFromName(moduleInstallBase, path, name string) string {
+	return filepath.Join(moduleInstallBase, path, name)
 }
 
 // makeDirectory does a MkdirAll for leafDir, and then makes sure it and it's

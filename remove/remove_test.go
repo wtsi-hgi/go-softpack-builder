@@ -3,6 +3,7 @@ package remove
 import (
 	"encoding/json"
 	"io"
+	"log/slog"
 	"math/rand"
 	"net/http"
 	"net/http/httptest"
@@ -16,10 +17,7 @@ import (
 	"github.com/wtsi-hgi/go-softpack-builder/config"
 )
 
-const (
-	groupsDir        = "groups"
-	singularityImage = "singularity.sif"
-)
+const groupsDir = "groups"
 
 type mockS3 struct{}
 
@@ -28,6 +26,12 @@ func (mockS3) RemoveFile(_ string) error {
 }
 
 func TestRemove(t *testing.T) {
+	programLevel := new(slog.LevelVar)
+
+	slog.SetDefault(slog.New(slog.NewTextHandler(io.Discard, &slog.HandlerOptions{Level: programLevel})))
+
+	programLevel.Set(slog.LevelDebug)
+
 	Convey("With a valid config and a test environment to be removed", t, func() {
 		conf, group, env, version := createTestEnv(t)
 
@@ -66,7 +70,7 @@ func TestRemove(t *testing.T) {
 			So(err, ShouldBeNil)
 
 			_, err = os.Stat(filepath.Join(conf.Module.ScriptsInstallDir, groupsDir,
-				group, env, version+build.ScriptsDirSuffix, singularityImage))
+				group, env, version+build.ScriptsDirSuffix, build.ImageBasename))
 			So(err, ShouldBeNil)
 
 			removing := filepath.Join(conf.Module.ModuleInstallDir, groupsDir, group, env)
@@ -143,7 +147,7 @@ func createTestEnv(t *testing.T) (*config.Config, string, string, string) {
 	So(err, ShouldBeNil)
 	So(f.Close(), ShouldBeNil)
 
-	f, err = os.Create(filepath.Join(scriptsPath, singularityImage))
+	f, err = os.Create(filepath.Join(scriptsPath, build.ImageBasename))
 	So(err, ShouldBeNil)
 
 	_, err = io.WriteString(f, "An Image File")

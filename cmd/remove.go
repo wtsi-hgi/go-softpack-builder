@@ -9,25 +9,28 @@ import (
 	"github.com/wtsi-hgi/go-softpack-builder/s3"
 )
 
+const numArgs = 2
+
 var removeCmd = &cobra.Command{
 	Use:   "remove",
 	Short: "Remove an environment",
 	Long: `Remove an environment.
 
 Remove an existing environment; it's entry in the Core artefacts repo, the
-module files and the singularity image and symlinks.`,
+module files and the singularity image and symlinks.
+
+Usage: gsb remove softpack/env/path version
+`,
 	Run: func(cmd *cobra.Command, args []string) {
 		if len(args) < 1 {
-			die("require a environment path")
+			die("environment path required")
 		}
 
-		const maxArgs = 2
-
-		if len(args) < maxArgs {
-			die("require a environment version")
+		if len(args) < numArgs {
+			die("environment version required")
 		}
 
-		if len(args) != maxArgs {
+		if len(args) != numArgs {
 			die("unexpected arguments")
 		}
 
@@ -38,13 +41,13 @@ module files and the singularity image and symlinks.`,
 			die(err.Error())
 		}
 
-		envPath := filepath.Clean(string(filepath.Separator) + args[0])[1:]
+		envPath := cleanEnvPath(args[0])
 
 		if envPath != args[0] {
 			die("invalid environment path")
 		}
 
-		fmt.Printf(
+		cliPrint(
 			"Will now remove environment %s-%s from artefacts repo and modules.\n"+
 				"Are you sure you sure you wish to proceed? [yN]: ",
 			envPath,
@@ -67,4 +70,10 @@ module files and the singularity image and symlinks.`,
 
 func init() {
 	RootCmd.AddCommand(removeCmd)
+}
+
+// cleanEnvPath strips out any attempts to manipulate the envPath in order to
+// get GSB to remove incorrect files.
+func cleanEnvPath(envPath string) string {
+	return filepath.Clean(string(filepath.Separator) + envPath)[1:]
 }

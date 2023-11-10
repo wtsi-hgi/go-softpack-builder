@@ -70,17 +70,14 @@ func TestS3(t *testing.T) {
 				buf, err := io.ReadAll(f)
 				So(err, ShouldBeNil)
 				So(string(buf), ShouldEqual, testData)
-			})
 
-			Convey("And remove it", func() {
-				_, err = s3.OpenFile(basename)
-				So(err, ShouldBeNil)
+				Convey("And remove it", func() {
+					err = s3.RemoveFile(basename)
+					So(err, ShouldBeNil)
 
-				err = s3.RemoveFile(basename)
-				So(err, ShouldBeNil)
-
-				_, err = s3.OpenFile(basename)
-				So(err, ShouldNotBeNil)
+					_, err = s3.OpenFile(basename)
+					So(err, ShouldNotBeNil)
+				})
 			})
 		})
 	})

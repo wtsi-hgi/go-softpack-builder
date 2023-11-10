@@ -7,7 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -17,6 +17,16 @@ import (
 	"github.com/wtsi-hgi/go-softpack-builder/config"
 	"golang.org/x/sys/unix"
 )
+
+var s3BasenamesForDeletion = [...]string{ //nolint:gochecknoglobals
+	build.SingularityDefBasename,
+	build.ExesBasename,
+	build.SoftpackYaml,
+	build.SpackLockFile,
+	build.BuilderOut,
+	build.UsageBasename,
+	build.ImageBasename,
+}
 
 type Error string
 
@@ -34,7 +44,7 @@ type coreResponse struct {
 	} `json:"data"`
 }
 
-type S3Remover interface {
+type s3Remover interface {
 	RemoveFile(string) error
 }
 
@@ -64,11 +74,12 @@ type graphQLDeleteEnvironmentMutation struct {
 	} `json:"variables"`
 }
 
-func Remove(conf *config.Config, s S3Remover, envPath, version string) error {
-	envPath = filepath.Clean(string(filepath.Separator) + envPath)[1:]
-
-	modulePath := filepath.Join(conf.Module.ModuleInstallDir, envPath)
-	scriptPath := filepath.Join(conf.Module.ScriptsInstallDir, envPath, version+build.ScriptsDirSuffix)
+// Remove will attempt to remove an environments artefacts from Core, S3, and
+// the installed locations.
+func Remove(conf *config.Config, s3r s3Remover, envPath, version string) error {
+	envDir, envName := filepath.Split(envPath)
+	modulePath := build.ModuleDirFromName(conf.Module.ModuleInstallDir, envDir, envName)
+	scriptPath := build.ScriptsDirFromNameAndVersion(conf.Module.ScriptsInstallDir, envDir, envName, version)
 
 	if err := checkWriteAccess(modulePath, scriptPath); err != nil {
 		return err
@@ -82,7 +93,7 @@ func Remove(conf *config.Config, s S3Remover, envPath, version string) error {
 		return err
 	}
 
-	return removeFromS3(s, modulePath)
+	return removeFromS3(s3r, modulePath)
 }
 
 func checkWriteAccess(modulePath, scriptPath string) error {
@@ -102,7 +113,7 @@ func checkWriteAccess(modulePath, scriptPath string) error {
 }
 
 func removeEnvFromCore(conf *config.Config, envPath string) error {
-	log.Printf("Removing env %s from core\n", envPath)
+	slog.Info(fmt.Sprintf("Removing env %s from core\n", envPath))
 
 	req, err := http.NewRequestWithContext(
 		context.Background(),
@@ -170,27 +181,25 @@ func removeAllNoDescend(path string) error {
 	for _, file := range files {
 		toRemove := filepath.Join(path, file.Name())
 
-		log.Printf("Removing file: %s\n", toRemove)
+		slog.Info(fmt.Sprintf("Removing file: %s\n", toRemove))
 
 		if err := os.Remove(toRemove); err != nil {
 			return err
 		}
 	}
 
-	log.Printf("Removing directory: %s\n", path)
+	slog.Info(fmt.Sprintf("Removing directory: %s\n", path))
 
 	return os.Remove(path)
 }
 
-var files = [...]string{"build.out", "singularity.def", "singularity.sif", "executables"} //nolint:gochecknoglobals
-
-func removeFromS3(s S3Remover, path string) error {
-	for _, file := range files {
+func removeFromS3(s3r s3Remover, path string) error {
+	for _, file := range s3BasenamesForDeletion {
 		toRemove := filepath.Join(path, file)
 
-		log.Printf("Removing file from S3: %s\n", toRemove)
+		slog.Info(fmt.Sprintf("Removing file from S3: %s\n", toRemove))
 
-		if err := s.RemoveFile(toRemove); err != nil && !errors.Is(err, os.ErrNotExist) {
+		if err := s3r.RemoveFile(toRemove); err != nil && !errors.Is(err, os.ErrNotExist) {
 			return err
 		}
 	}
