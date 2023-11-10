@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/wtsi-hgi/go-softpack-builder/build"
 	"github.com/wtsi-hgi/go-softpack-builder/config"
@@ -23,9 +22,11 @@ func (e Error) Error() string {
 
 type coreResponse struct {
 	Data struct {
-		Message string `json:"message,omitempty"`
-		Path    string `json:"path,omitempty"`
-		Name    string `json:"name,omitempty"`
+		DeleteEnvironment struct {
+			Message string `json:"message,omitempty"`
+			Path    string `json:"path,omitempty"`
+			Name    string `json:"name,omitempty"`
+		} `json:"deleteEnvironment"`
 	} `json:"data"`
 }
 
@@ -51,14 +52,12 @@ const graphQLDeleteEnvironment = `mutation ($name: String!, $envPath: String!) {
 
 const graphQLEndpoint = "/graphql"
 
-type graphQLDeleteEnvironmentVariables struct {
-	Name    string `json:"name"`
-	EnvPath string `json:"envPath"`
-}
-
 type graphQLDeleteEnvironmentMutation struct {
 	Query     string `json:"query"` //graphQLDeleteEnvironment
-	Variables string `json:"variables"`
+	Variables struct {
+		Name    string `json:"name"`
+		EnvPath string `json:"envPath"`
+	} `json:"variables"`
 }
 
 func Remove(conf *config.Config, s S3Remover, envPath, version string) error {
@@ -105,21 +104,13 @@ func checkWriteAccess(modulePath, scriptPath string) error {
 func removeEnvFromCore(conf *config.Config, envPath string) error {
 	fmt.Printf("Removing env %s from core\n", envPath)
 
-	variables := graphQLDeleteEnvironmentVariables{
-		Name:    filepath.Base(envPath),
-		EnvPath: filepath.Dir(envPath),
+	mutation := graphQLDeleteEnvironmentMutation{
+		Query: graphQLDeleteEnvironment,
 	}
+	mutation.Variables.Name = filepath.Base(envPath)
+	mutation.Variables.EnvPath = filepath.Dir(envPath)
 
 	var buf bytes.Buffer
-
-	json.NewEncoder(&buf).Encode(variables)
-
-	mutation := graphQLDeleteEnvironmentMutation{
-		Query:     graphQLDeleteEnvironment,
-		Variables: strings.TrimSpace(buf.String()),
-	}
-
-	buf.Reset()
 
 	json.NewEncoder(&buf).Encode(mutation)
 
@@ -141,8 +132,8 @@ func removeEnvFromCore(conf *config.Config, envPath string) error {
 		return err
 	}
 
-	if cr.Data.Name != "" {
-		return Error(cr.Data.Message)
+	if cr.Data.DeleteEnvironment.Name != "" {
+		return Error(cr.Data.DeleteEnvironment.Message)
 	}
 
 	return nil

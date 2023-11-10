@@ -82,9 +82,9 @@ func TestRemove(t *testing.T) {
 		})
 
 		Convey("Remove() call fails if environment is not successfully removed from Core", func() {
-			response.Data.Message = "No environment with this name found in this location."
-			response.Data.Path = filepath.Join(groupsDir, group)
-			response.Data.Name = env + "-" + version
+			response.Data.DeleteEnvironment.Message = "No environment with this name found in this location."
+			response.Data.DeleteEnvironment.Path = filepath.Join(groupsDir, group)
+			response.Data.DeleteEnvironment.Name = env + "-" + version
 
 			err := Remove(conf, s3Mock, envPath, version)
 			So(err, ShouldNotBeNil)
@@ -97,7 +97,7 @@ func TestRemove(t *testing.T) {
 		})
 
 		Convey("Can use Remove() to delete an existing environment", func() {
-			response.Data.Message = "Successfully deleted the environment"
+			response.Data.DeleteEnvironment.Message = "Successfully deleted the environment"
 
 			modulePath := filepath.Join(conf.Module.ModuleInstallDir, groupsDir, group, env)
 			scriptsPath := filepath.Join(conf.Module.ScriptsInstallDir, groupsDir, group, env, version+build.ScriptsDirSuffix)
