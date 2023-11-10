@@ -1,6 +1,9 @@
 package cmd
 
 import (
+	"fmt"
+	"path/filepath"
+
 	"github.com/spf13/cobra"
 	"github.com/wtsi-hgi/go-softpack-builder/remove"
 	"github.com/wtsi-hgi/go-softpack-builder/s3"
@@ -33,7 +36,28 @@ module files and the singularity image and symlinks.`,
 			die(err.Error())
 		}
 
-		if err := remove.Remove(conf, s, args[1], args[2]); err != nil {
+		envPath := filepath.Clean(string(filepath.Separator) + args[0])[1:]
+
+		if envPath != args[0] {
+			die("invalid environment path")
+		}
+
+		fmt.Printf(
+			"Will now remove environment %s-%s from artefacts repo and modules.\n"+
+				"Are you sure you sure you wish to proceed? [yN]: ",
+			envPath,
+			args[1],
+		)
+
+		var resp string
+
+		fmt.Scan(&resp)
+
+		if resp != "y" {
+			return
+		}
+
+		if err := remove.Remove(conf, s, envPath, args[1]); err != nil {
 			die(err.Error())
 		}
 	},
