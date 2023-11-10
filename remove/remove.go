@@ -169,6 +169,8 @@ func removeAllNoDescend(path string) error {
 		}
 	}
 
+	fmt.Printf("Removing directory: %s\n", path)
+
 	return os.Remove(path)
 }
 
