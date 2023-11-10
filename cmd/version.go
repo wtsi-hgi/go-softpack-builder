@@ -24,8 +24,6 @@
 package cmd
 
 import (
-	"fmt"
-
 	"github.com/spf13/cobra"
 )
 
@@ -40,7 +38,7 @@ var versionCmd = &cobra.Command{
 	Short: "Print gsb version",
 	Long:  `Print gsb version.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println(Version)
+		cliPrint(Version)
 	},
 }
 

@@ -18,5 +18,5 @@ spack:
   finalImage: "ubuntu:22.04"
   processorTarget: "x86_64_v4"
 
-coreURL: "http://x.y.z:9837/graphql"
+coreURL: "http://x.y.z:9837/softpack"
 listenURL: "localhost:2456"

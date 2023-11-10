@@ -59,3 +59,8 @@ func die(msg string, a ...interface{}) {
 	slog.Error(fmt.Sprintf(msg, a...))
 	os.Exit(1)
 }
+
+// cliPrint outputs the message to STDOUT.
+func cliPrint(msg string, a ...interface{}) {
+	fmt.Fprintf(os.Stdout, msg, a...)
+}

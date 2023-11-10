@@ -50,7 +50,7 @@ func TestConfig(t *testing.T) {
 		So(config.Spack.BuildImage, ShouldEqual, "spack/ubuntu-jammy:latest")
 		So(config.Spack.FinalImage, ShouldEqual, "ubuntu:22.04")
 		So(config.Spack.ProcessorTarget, ShouldEqual, "x86_64_v4")
-		So(config.CoreURL, ShouldEqual, "http://x.y.z:9837/graphql")
+		So(config.CoreURL, ShouldEqual, "http://x.y.z:9837/softpack")
 		So(config.ListenURL, ShouldEqual, "localhost:2456")
 	})
 }

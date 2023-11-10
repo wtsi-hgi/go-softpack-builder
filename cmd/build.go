@@ -156,7 +156,7 @@ func printIfTTY(msg string) {
 		return
 	}
 
-	fmt.Println(msg)
+	cliPrint(msg)
 }
 
 func openOrDie(path string) *os.File {

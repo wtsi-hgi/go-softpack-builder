@@ -120,7 +120,7 @@ spack:
   finalImage: "ubuntu:22.04"
   processorTarget: "x86_64_v3"
 
-coreURL: "http://x.y.z:9837/upload"
+coreURL: "http://x.y.z:9837/softpack"
 listenURL: "0.0.0.0:2456"
 ```
 
