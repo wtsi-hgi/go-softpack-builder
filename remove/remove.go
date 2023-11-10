@@ -21,9 +21,11 @@ func (e Error) Error() string {
 }
 
 type coreResponse struct {
-	Message string `json:"message,omitempty"`
-	Path    string `json:"path,omitempty"`
-	Name    string `json:"name,omitempty"`
+	Data struct {
+		Message string `json:"message,omitempty"`
+		Path    string `json:"path,omitempty"`
+		Name    string `json:"name,omitempty"`
+	} `json:"data"`
 }
 
 type S3Remover interface {
@@ -48,12 +50,14 @@ const graphQLDeleteEnvironment = `mutation ($name: String!, $envPath: String!) {
 
 const graphQLEndpoint = "/graphql"
 
+type graphQLDeleteEnvironmentVariables struct {
+	Name    string `json:"name"`
+	EnvPath string `json:"envPath"`
+}
+
 type graphQLDeleteEnvironmentMutation struct {
 	Query     string `json:"query"` //graphQLDeleteEnvironment
-	Variables struct {
-		Name    string `json:"name"`
-		EnvPath string `json:"envPath"`
-	} `json:"variables"`
+	Variables string `json:"variables"`
 }
 
 func Remove(conf *config.Config, s S3Remover, envPath, version string) error {
@@ -98,14 +102,21 @@ func checkWriteAccess(modulePath, scriptPath string) error {
 }
 
 func removeEnvFromCore(conf *config.Config, envPath string) error {
-	mutation := graphQLDeleteEnvironmentMutation{
-		Query: graphQLDeleteEnvironment,
+	variables := graphQLDeleteEnvironmentVariables{
+		Name:    filepath.Base(envPath),
+		EnvPath: filepath.Dir(envPath),
 	}
 
-	mutation.Variables.Name = filepath.Base(envPath)
-	mutation.Variables.EnvPath = filepath.Dir(envPath)
-
 	var buf bytes.Buffer
+
+	json.NewEncoder(&buf).Encode(variables)
+
+	mutation := graphQLDeleteEnvironmentMutation{
+		Query:     graphQLDeleteEnvironment,
+		Variables: buf.String(),
+	}
+
+	buf.Reset()
 
 	json.NewEncoder(&buf).Encode(mutation)
 
@@ -127,8 +138,8 @@ func removeEnvFromCore(conf *config.Config, envPath string) error {
 		return err
 	}
 
-	if cr.Name != "" {
-		return Error(cr.Message)
+	if cr.Data.Name != "" {
+		return Error(cr.Data.Message)
 	}
 
 	return nil
