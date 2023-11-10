@@ -543,7 +543,7 @@ func (b *Builder) addArtifactsToRepo(artifacts map[string]io.Reader, envPath str
 
 	defer pw.Close()
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, b.config.CoreURL+uploadEndpoint+"?"+url.QueryEscape(envPath), pr)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, strings.TrimSuffix(b.config.CoreURL, "/")+uploadEndpoint+"?"+url.QueryEscape(envPath), pr)
 	if err != nil {
 		return err
 	}
