@@ -26,8 +26,10 @@ package build
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	_ "embed"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log/slog"
 	"mime/multipart"
@@ -243,9 +245,11 @@ func (b *Builder) Build(def *Definition) (err error) {
 		return err
 	}
 
+	hash := fmt.Sprintf("%X", sha256.Sum256([]byte(singDef)))
+
 	singDefParentPath := filepath.Join(b.config.S3.BuildBase, s3Path)
 
-	wrInput, err = wr.SingularityBuildInS3WRInput(singDefParentPath)
+	wrInput, err = wr.SingularityBuildInS3WRInput(singDefParentPath, hash)
 	if err != nil {
 		return err
 	}

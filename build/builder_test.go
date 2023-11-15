@@ -24,7 +24,9 @@
 package build
 
 import (
+	"crypto/sha256"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
@@ -365,7 +367,8 @@ Stage: final
 				"  - r-seurat@4 arch=None-None-x86_64_v4\n  - py-anndata@3.14 arch=None-None-x86_64_v4\n  view")
 
 			<-mwr.ch
-			So(mwr.cmd, ShouldContainSubstring, "echo doing build in some_path/groups/hgi/xxhash/0.8.1; sudo singularity build")
+			hash := fmt.Sprintf("%X", sha256.Sum256([]byte(ms3.data)))
+			So(mwr.cmd, ShouldContainSubstring, "echo doing build with hash "+hash+"; sudo singularity build")
 
 			modulePath := filepath.Join(conf.Module.ModuleInstallDir,
 				def.EnvironmentPath, def.EnvironmentName, def.EnvironmentVersion)

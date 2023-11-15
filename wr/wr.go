@@ -48,10 +48,15 @@ func init() { //nolint:gochecknoinits
 // SingularityBuildInS3WRInput returns wr input that could be piped to `wr add`
 // and that would run a singularity build where the working directory is a fuse
 // mount of the given s3Path.
-func SingularityBuildInS3WRInput(s3Path string) (string, error) {
+func SingularityBuildInS3WRInput(s3Path, hash string) (string, error) {
 	var w strings.Builder
 
-	if err := wrTmpl.Execute(&w, s3Path); err != nil {
+	if err := wrTmpl.Execute(&w, struct {
+		S3Path, Hash string
+	}{
+		s3Path,
+		hash,
+	}); err != nil {
 		return "", err
 	}
 
