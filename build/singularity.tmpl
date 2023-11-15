@@ -23,7 +23,6 @@ EOF
 
 	# Install all the required software
 	. /opt/spack/share/spack/setup-env.sh
-	spack mirror add spackCache {{ .SpackBinaryCache }}
 	spack mirror add s3cache "{{ .S3BinaryCache }}"
 	tmpDir="$(mktemp -d)"
 	git clone "{{ .RepoURL }}" "$tmpDir"

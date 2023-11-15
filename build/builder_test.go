@@ -231,7 +231,6 @@ func TestBuilder(t *testing.T) {
 		conf.S3.BuildBase = "some_path"
 		conf.CustomSpackRepo = gmhttp.URL
 		conf.CoreURL = msc.URL
-		conf.Spack.BinaryCache = "https://binaries.spack.io/v0.20.1"
 		conf.Spack.BuildImage = "spack/ubuntu-jammy:v0.20.1"
 		conf.Spack.FinalImage = "ubuntu:22.04"
 		conf.Spack.ProcessorTarget = "x86_64_v4"
@@ -277,7 +276,6 @@ EOF
 
 	# Install all the required software
 	. /opt/spack/share/spack/setup-env.sh
-	spack mirror add spackCache https://binaries.spack.io/v0.20.1
 	spack mirror add s3cache "s3://spack"
 	tmpDir="$(mktemp -d)"
 	git clone "`+gmhttp.URL+`" "$tmpDir"
