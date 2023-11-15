@@ -307,6 +307,7 @@ EOF
 		echo "R"
 		echo "Rscript"
 		echo "python"
+		find /opt/view/bin/ -maxdepth 1 -type f -executable | xargs -r -L 1 basename
 	} | sort | uniq > executables
 
 Bootstrap: docker
