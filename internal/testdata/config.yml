@@ -13,7 +13,6 @@ module:
 customSpackRepo: "https://github.com/org/spack"
 
 spack:
-  binaryCache: "https://binaries.spack.io/develop"
   buildImage: "spack/ubuntu-jammy:latest"
   finalImage: "ubuntu:22.04"
   processorTarget: "x86_64_v4"

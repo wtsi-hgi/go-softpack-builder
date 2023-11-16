@@ -24,7 +24,9 @@
 package build
 
 import (
+	"crypto/sha256"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
@@ -229,7 +231,6 @@ func TestBuilder(t *testing.T) {
 		conf.S3.BuildBase = "some_path"
 		conf.CustomSpackRepo = gmhttp.URL
 		conf.CoreURL = msc.URL
-		conf.Spack.BinaryCache = "https://binaries.spack.io/v0.20.1"
 		conf.Spack.BuildImage = "spack/ubuntu-jammy:v0.20.1"
 		conf.Spack.FinalImage = "ubuntu:22.04"
 		conf.Spack.ProcessorTarget = "x86_64_v4"
@@ -275,7 +276,6 @@ EOF
 
 	# Install all the required software
 	. /opt/spack/share/spack/setup-env.sh
-	spack mirror add spackCache https://binaries.spack.io/v0.20.1
 	spack mirror add s3cache "s3://spack"
 	tmpDir="$(mktemp -d)"
 	git clone "`+gmhttp.URL+`" "$tmpDir"
@@ -307,6 +307,7 @@ EOF
 		echo "R"
 		echo "Rscript"
 		echo "python"
+		find /opt/view/bin/ -maxdepth 1 -type f -executable | xargs -r -L 1 basename
 	} | sort | uniq > executables
 
 Bootstrap: docker
@@ -364,7 +365,8 @@ Stage: final
 				"  - r-seurat@4 arch=None-None-x86_64_v4\n  - py-anndata@3.14 arch=None-None-x86_64_v4\n  view")
 
 			<-mwr.ch
-			So(mwr.cmd, ShouldContainSubstring, "echo doing build in some_path/groups/hgi/xxhash/0.8.1; sudo singularity build")
+			hash := fmt.Sprintf("%X", sha256.Sum256([]byte(ms3.data)))
+			So(mwr.cmd, ShouldContainSubstring, "echo doing build with hash "+hash+"; sudo singularity build")
 
 			modulePath := filepath.Join(conf.Module.ModuleInstallDir,
 				def.EnvironmentPath, def.EnvironmentName, def.EnvironmentVersion)

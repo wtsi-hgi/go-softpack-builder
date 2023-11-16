@@ -46,9 +46,10 @@ func TestWR(t *testing.T) {
 	s3Path := buildBase + envPath + "/" + envName
 
 	Convey("You can generate a wr input", t, func() {
-		wrInput, err := SingularityBuildInS3WRInput(s3Path)
+		const hash = "0110"
+		wrInput, err := SingularityBuildInS3WRInput(s3Path, hash)
 		So(err, ShouldBeNil)
-		So(wrInput, ShouldEqual, `{"cmd": "echo doing build in spack/builds/users/user/myenv; `+
+		So(wrInput, ShouldEqual, `{"cmd": "echo doing build with hash `+hash+`; `+
 			`sudo singularity build $TMPDIR/singularity.sif singularity.def &> builder.out && `+
 			`sudo singularity run $TMPDIR/singularity.sif cat /opt/spack-environment/executables > executables && `+
 			`sudo singularity run $TMPDIR/singularity.sif cat /opt/spack-environment/spack.lock > spack.lock && `+

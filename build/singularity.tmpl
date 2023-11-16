@@ -23,7 +23,6 @@ EOF
 
 	# Install all the required software
 	. /opt/spack/share/spack/setup-env.sh
-	spack mirror add spackCache {{ .SpackBinaryCache }}
 	spack mirror add s3cache "{{ .S3BinaryCache }}"
 	tmpDir="$(mktemp -d)"
 	git clone "{{ .RepoURL }}" "$tmpDir"
@@ -55,6 +54,7 @@ EOF
 		{{- range .ExtraExes }}
 		echo "{{ . }}"
 		{{- end }}
+		find /opt/view/bin/ -maxdepth 1 -type f -executable | xargs -r -L 1 basename
 	} | sort | uniq > executables
 
 Bootstrap: docker

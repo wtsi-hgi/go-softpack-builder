@@ -46,7 +46,6 @@ func TestConfig(t *testing.T) {
 		So(config.Module.WrapperScript, ShouldEqual, "/path/to/wrapper/script")
 		So(config.Module.Dependencies, ShouldResemble, []string{"/software/modules/ISG/singularity/3.10.0"})
 		So(config.CustomSpackRepo, ShouldEqual, "https://github.com/org/spack")
-		So(config.Spack.BinaryCache, ShouldEqual, "https://binaries.spack.io/develop")
 		So(config.Spack.BuildImage, ShouldEqual, "spack/ubuntu-jammy:latest")
 		So(config.Spack.FinalImage, ShouldEqual, "ubuntu:22.04")
 		So(config.Spack.ProcessorTarget, ShouldEqual, "x86_64_v4")
