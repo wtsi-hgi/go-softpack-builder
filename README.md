@@ -115,7 +115,6 @@ module:
 customSpackRepo: "https://github.com/org/spack-repo.git"
 
 spack:
-  binaryCache: "https://binaries.spack.io/v0.20.1"
   buildImage: "spack/ubuntu-jammy:v0.20.1"
   finalImage: "ubuntu:22.04"
   processorTarget: "x86_64_v3"
@@ -146,9 +145,6 @@ Where:
 - customSpackRepo is your own repository of Spack packages containing your own
   custom recipies. It will be used in addition to Spack's build-in repo during
   builds.
-- spack.binaryCache is the URL of spack's binary cache. The version should match
-  the spack version in your buildImage. You can find the URLs via
-  https://cache.spack.io.
 - buildImage is spack's docker image from their docker hub with the desired
   version (don't use latest if you want reproducability) of spack and desired
   OS.
