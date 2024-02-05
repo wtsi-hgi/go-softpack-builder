@@ -38,11 +38,16 @@ import (
 const userPerms = 0700
 
 type fakeBuilder struct {
-	t time.Time
+	cb func()
 }
 
-func (f *fakeBuilder) LastBuiltTime() time.Time {
-	return f.t
+func (f *fakeBuilder) SetPostBuildCallback(cb func()) {
+	f.cb = cb
+}
+
+func (f *fakeBuilder) buildCalled() time.Time {
+	f.cb()
+	return time.Now()
 }
 
 func TestReindex(t *testing.T) {
@@ -78,10 +83,9 @@ func TestReindex(t *testing.T) {
 		fb := &fakeBuilder{}
 
 		Convey("We can schedule the reindex job", func() {
-			fb.t = time.Now().Add(-1 * time.Second)
 			s := NewScheduler(&conf, fb)
 			s.Start()
-			started := time.Now()
+			started := fb.buildCalled()
 			defer s.Stop()
 
 			index := getIndex(cacheDir, started)
@@ -91,9 +95,9 @@ func TestReindex(t *testing.T) {
 			err = copy.Copy(sig2, filepath.Join(cacheDir, sig2))
 			So(err, ShouldBeNil)
 
-			fb.t = time.Now()
+			lastBuild := fb.buildCalled()
 			<-time.After(hoursToDuration(conf.Spack.ReindexHours))
-			index = getIndex(cacheDir, fb.t)
+			index = getIndex(cacheDir, lastBuild)
 			So(index, ShouldContainSubstring, "dnenyfmmx3fbiksufzhmb4qwjcvej7jg")
 		})
 
@@ -106,9 +110,9 @@ func TestReindex(t *testing.T) {
 			index := getIndex(cacheDir, started)
 			So(index, ShouldBeBlank)
 
-			fb.t = time.Now()
+			lastBuild := fb.buildCalled()
 			<-time.After(hoursToDuration(conf.Spack.ReindexHours))
-			index = getIndex(cacheDir, fb.t)
+			index = getIndex(cacheDir, lastBuild)
 			So(index, ShouldNotBeBlank)
 		})
 	})

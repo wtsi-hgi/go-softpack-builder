@@ -32,22 +32,22 @@ import (
 
 const reindexHoursDividerForCheckingLastBuildTime = 2
 
-// BuildTimeTracker can tell when a build last took place.
-type BuildTimeTracker interface {
-	LastBuiltTime() time.Time
+// Builder can tell us when a build takes place.
+type Builder interface {
+	SetPostBuildCallback(func())
 }
 
 // Scheduler periodically updates the Spack buildcache index.
 type Scheduler struct {
-	throt *Throttler
-	conf  *config.Config
-	btt   BuildTimeTracker
-	quit  chan struct{}
+	throt   *Throttler
+	conf    *config.Config
+	builder Builder
+	quit    chan struct{}
 }
 
 // NewScheduler returns a scheduler that can update the Spack buildcache index
 // periodically.
-func NewScheduler(conf *config.Config, btt BuildTimeTracker) *Scheduler {
+func NewScheduler(conf *config.Config, builder Builder) *Scheduler {
 	reindex := func() {
 		cmd := exec.Command("spack", "buildcache", "update-index", "--", conf.S3.BinaryCache) //nolint:gosec
 		// TODO: log the error
@@ -55,13 +55,13 @@ func NewScheduler(conf *config.Config, btt BuildTimeTracker) *Scheduler {
 	}
 
 	s := &Scheduler{
-		throt: NewThrottle(reindex, hoursToDuration(conf.Spack.ReindexHours), true),
-		conf:  conf,
-		btt:   btt,
-		quit:  make(chan struct{}),
+		throt:   NewThrottle(reindex, hoursToDuration(conf.Spack.ReindexHours), true),
+		conf:    conf,
+		builder: builder,
+		quit:    make(chan struct{}),
 	}
 
-	go s.watchForNewBuilds()
+	builder.SetPostBuildCallback(s.Signal)
 
 	return s
 }
@@ -70,31 +70,15 @@ func hoursToDuration(hours float64) time.Duration {
 	return time.Duration(hours*millisecondsInHour) * time.Millisecond
 }
 
-func (s *Scheduler) watchForNewBuilds() {
-	ticker := time.NewTicker(hoursToDuration(s.conf.Spack.ReindexHours / reindexHoursDividerForCheckingLastBuildTime))
-	defer ticker.Stop()
-
-	var lbt time.Time
-
-	for {
-		select {
-		case <-ticker.C:
-			newLBT := s.btt.LastBuiltTime()
-			if newLBT != lbt {
-				lbt = newLBT
-
-				s.throt.Signal()
-			}
-		case <-s.quit:
-			return
-		}
-	}
-}
-
 // Start starts the scheduler, calling `spack buildcache update-index`
 // immediately.
 func (s *Scheduler) Start() {
 	s.throt.Start()
+}
+
+// Signal signals that a build has happened and a reindex is now needed.
+func (s *Scheduler) Signal() {
+	s.throt.Signal()
 }
 
 // Stop prevents future invocations of `spack buildcache update-index` (but
