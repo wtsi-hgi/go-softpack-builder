@@ -45,7 +45,8 @@ func TestThrottle(t *testing.T) {
 		Convey("Throttle lets you do things only once every period of time", func() {
 			started := time.Now()
 
-			throt := Throttle(throttleOp, period)
+			throt := NewThrottle(throttleOp, period, false)
+			throt.Start()
 			defer throt.Stop()
 
 			called := <-calls
@@ -71,7 +72,8 @@ func TestThrottle(t *testing.T) {
 			So(callLength, ShouldBeGreaterThan, period)
 			started := time.Now()
 
-			throt := Throttle(throttleOp, period)
+			throt := NewThrottle(throttleOp, period, false)
+			throt.Start()
 			defer throt.Stop()
 
 			called := <-calls
@@ -82,6 +84,26 @@ func TestThrottle(t *testing.T) {
 
 			called3 := <-calls
 			So(called3, ShouldHappenWithin, tolerance, started.Add(period*4).Add(callLength))
+		})
+
+		Convey("Throttle only runs the task if it has received a signal since it last ran", func() {
+			started := time.Now()
+
+			throt := NewThrottle(throttleOp, period, true)
+			throt.Start()
+			defer throt.Stop()
+
+			<-time.After(20 * period)
+			select {
+			case <-calls:
+				So(true, ShouldBeFalse)
+			default:
+				So(true, ShouldBeTrue)
+			}
+
+			throt.Signal()
+			called := <-calls
+			So(called, ShouldHappenWithin, tolerance, started.Add(21*period))
 		})
 	})
 }

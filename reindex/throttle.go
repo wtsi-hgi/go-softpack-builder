@@ -28,39 +28,81 @@ import (
 	"time"
 )
 
+// Throttler lets you run a function limited to certain times.
 type Throttler struct {
-	requestedStop chan struct{}
-	stopped       bool
+	op             func()
+	period         time.Duration
+	requestedStop  chan struct{}
+	requriesSignal bool
+	started        bool
+	blocked        bool
+	stopped        bool
+	runner         *opRunner
 	sync.Mutex
 }
 
-func Throttle(op func(), period time.Duration) *Throttler {
-	throt := &Throttler{
-		requestedStop: make(chan struct{}),
+// NewThrottle returns a Throttler. Setting requiresSignal to true means that
+// you must call Signal() for op to be run in the next period.
+func NewThrottle(op func(), period time.Duration, requiresSignal bool) *Throttler {
+	return &Throttler{
+		op:             op,
+		period:         period,
+		requriesSignal: requiresSignal,
+		blocked:        requiresSignal,
+	}
+}
+
+// Start starts running our op every one of our periods, but not if the
+// function is still running, and optionally only if a signal has been
+// received.
+func (t *Throttler) Start() {
+	t.Lock()
+	defer t.Unlock()
+
+	if t.started {
+		t.Unlock()
+		t.Stop()
+		t.Lock()
 	}
 
-	go func() {
-		runner := &opRunner{
-			op: op,
+	t.requestedStop = make(chan struct{})
+	t.started = true
+	t.stopped = false
+
+	go t.runEveryPeriod()
+}
+
+func (t *Throttler) runEveryPeriod() {
+	t.runner = &opRunner{
+		op: t.op,
+	}
+
+	ticker := time.NewTicker(t.period)
+	defer ticker.Stop()
+
+	t.runIfSignalled()
+
+	for {
+		select {
+		case <-ticker.C:
+			t.runIfSignalled()
+
+		case <-t.requestedStop:
+			return
 		}
+	}
+}
 
-		ticker := time.NewTicker(period)
-		defer ticker.Stop()
+func (t *Throttler) runIfSignalled() {
+	t.Lock()
+	defer t.Unlock()
 
-		runner.run()
+	if t.blocked {
+		return
+	}
 
-		for {
-			select {
-			case <-ticker.C:
-				runner.run()
-
-			case <-throt.requestedStop:
-				return
-			}
-		}
-	}()
-
-	return throt
+	t.runner.run()
+	t.blocked = t.requriesSignal
 }
 
 type opRunner struct {
@@ -88,14 +130,26 @@ func (o *opRunner) run() {
 	}()
 }
 
-func (throt *Throttler) Stop() {
-	throt.Lock()
-	defer throt.Unlock()
+// Signal allows our op to be run when the next period starts, if we were
+// configured with requiresSignal.
+func (t *Throttler) Signal() {
+	t.Lock()
+	defer t.Unlock()
 
-	if throt.stopped {
+	t.blocked = false
+}
+
+// Stop stops us doing any futher runs of our op, but doesn't stop any ongoing
+// run.
+func (t *Throttler) Stop() {
+	t.Lock()
+	defer t.Unlock()
+
+	if t.stopped {
 		return
 	}
 
-	close(throt.requestedStop)
-	throt.stopped = true
+	close(t.requestedStop)
+	t.stopped = true
+	t.started = false
 }
