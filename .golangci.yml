@@ -40,6 +40,10 @@ linters-settings:
     simple: true
     range-loops: true
     for-loops: true
+  revive:
+    rules:
+      - name: dot-imports
+        disabled: true
   unparam:
     check-exported: true
   unused:
