@@ -39,7 +39,8 @@ func TestThrottle(t *testing.T) {
 			calls <- time.Now()
 		}
 
-		period := 10 * time.Millisecond
+		periodms := 10
+		period := time.Duration(periodms) * time.Millisecond
 		tolerance := 2 * time.Millisecond
 
 		Convey("Throttle lets you do things only once every period of time", func() {
@@ -93,7 +94,12 @@ func TestThrottle(t *testing.T) {
 			throt.Start()
 			defer throt.Stop()
 
-			<-time.After(20 * period)
+			go func() {
+				<-time.After(time.Duration(float64(periodms)*3.5) * time.Millisecond)
+				throt.Signal()
+			}()
+
+			<-time.After(3 * period)
 			select {
 			case <-calls:
 				So(true, ShouldBeFalse)
@@ -101,9 +107,8 @@ func TestThrottle(t *testing.T) {
 				So(true, ShouldBeTrue)
 			}
 
-			throt.Signal()
 			called := <-calls
-			So(called, ShouldHappenWithin, tolerance, started.Add(21*period))
+			So(called, ShouldHappenWithin, tolerance, started.Add(4*period))
 		})
 	})
 }
