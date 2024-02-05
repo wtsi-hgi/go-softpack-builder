@@ -46,9 +46,10 @@ type Config struct {
 	} `yaml:"module"`
 	CustomSpackRepo string `yaml:"customSpackRepo"`
 	Spack           struct {
-		BuildImage      string `yaml:"buildImage"`
-		FinalImage      string `yaml:"finalImage"`
-		ProcessorTarget string `yaml:"processorTarget"`
+		BuildImage      string  `yaml:"buildImage"`
+		FinalImage      string  `yaml:"finalImage"`
+		ProcessorTarget string  `yaml:"processorTarget"`
+		ReindexHours    float64 `yaml:"reindexHours"`
 	} `yaml:"spack"`
 	CoreURL      string `yaml:"coreURL"`
 	ListenURL    string `yaml:"listenURL"`

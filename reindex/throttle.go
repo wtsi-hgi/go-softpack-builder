@@ -28,6 +28,8 @@ import (
 	"time"
 )
 
+const millisecondsInHour = 60 * 60 * 1000
+
 // Throttler lets you run a function limited to certain times.
 type Throttler struct {
 	op             func()
@@ -101,8 +103,8 @@ func (t *Throttler) runIfSignalled() {
 		return
 	}
 
-	t.runner.run()
-	t.blocked = t.requriesSignal
+	ran := t.runner.run()
+	t.blocked = t.requriesSignal && ran
 }
 
 type opRunner struct {
@@ -111,13 +113,16 @@ type opRunner struct {
 	running bool
 }
 
-// run runs our op unless we're already running.
-func (o *opRunner) run() {
+// run runs our op unless we're already running. Returns true if we ran this
+// time.
+func (o *opRunner) run() bool {
 	o.Lock()
 	if o.running {
 		o.Unlock()
-		return
+
+		return false
 	}
+
 	o.running = true
 	o.Unlock()
 
@@ -128,6 +133,8 @@ func (o *opRunner) run() {
 		o.running = false
 		o.Unlock()
 	}()
+
+	return true
 }
 
 // Signal allows our op to be run when the next period starts, if we were
@@ -139,7 +146,7 @@ func (t *Throttler) Signal() {
 	t.blocked = false
 }
 
-// Stop stops us doing any futher runs of our op, but doesn't stop any ongoing
+// Stop stops us doing any further runs of our op, but doesn't stop any ongoing
 // run.
 func (t *Throttler) Stop() {
 	t.Lock()
