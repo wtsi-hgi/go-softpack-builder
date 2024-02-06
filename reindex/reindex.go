@@ -24,6 +24,7 @@
 package reindex
 
 import (
+	"log/slog"
 	"os/exec"
 	"time"
 
@@ -48,8 +49,15 @@ type Scheduler struct {
 func NewScheduler(conf *config.Config, builder Builder) *Scheduler {
 	reindex := func() {
 		cmd := exec.Command("spack", "buildcache", "update-index", "--", conf.S3.BinaryCache) //nolint:gosec
-		// TODO: log the error
-		_ = cmd.Run()
+
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			slog.Error("could not run spack buildcache update-index", "err", err.Error())
+		}
+
+		if len(out) > 0 {
+			slog.Error("spack reindex failed", "out", string(out))
+		}
 	}
 
 	s := &Scheduler{

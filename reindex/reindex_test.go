@@ -24,9 +24,11 @@
 package reindex
 
 import (
+	"log/slog"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -114,6 +116,30 @@ func TestReindex(t *testing.T) {
 			<-time.After(hoursToDuration(conf.Spack.ReindexHours))
 			index = getIndex(cacheDir, lastBuild)
 			So(index, ShouldNotBeBlank)
+		})
+
+		Convey("Spack errors are logged", func() {
+			logWriter := new(strings.Builder)
+			slog.SetDefault(slog.New(slog.NewTextHandler(logWriter, nil)))
+
+			conf.S3.BinaryCache = "/bad"
+			s := NewScheduler(&conf, fb)
+			s.Start()
+			started := fb.buildCalled()
+			defer s.Stop()
+
+			getIndex(cacheDir, started)
+			So(logWriter.String(), ShouldContainSubstring, `level=ERROR msg="spack reindex failed"`)
+			So(logWriter.String(), ShouldContainSubstring, "file:///bad/build_cache: [Errno 2] No such file or directory")
+
+			Convey("including when spack isn't available", func() {
+				os.Setenv("PATH", "/garbage")
+				started := fb.buildCalled()
+
+				getIndex(cacheDir, started)
+				So(logWriter.String(), ShouldContainSubstring, `level=ERROR msg="could not run spack buildcache update-index"`)
+				So(logWriter.String(), ShouldContainSubstring, "executable file not found in $PATH")
+			})
 		})
 	})
 }
