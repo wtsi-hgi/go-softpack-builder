@@ -80,7 +80,7 @@ func NewScheduler(conf *config.Config, builder Builder) *Scheduler {
 }
 
 func hoursToDuration(hours float64) time.Duration {
-	return time.Duration(hours*millisecondsInHour) * time.Millisecond
+	return time.Duration(hours * float64(time.Hour))
 }
 
 // Start starts the scheduler, calling `spack buildcache update-index`

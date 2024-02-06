@@ -28,8 +28,6 @@ import (
 	"time"
 )
 
-const millisecondsInHour = 60 * 60 * 1000
-
 // Throttler lets you run a function limited to certain times.
 type Throttler struct {
 	op             func()
