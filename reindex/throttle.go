@@ -60,9 +60,7 @@ func (t *Throttler) Start() {
 	defer t.Unlock()
 
 	if t.started {
-		t.Unlock()
-		t.Stop()
-		t.Lock()
+		t.stop()
 	}
 
 	t.requestedStop = make(chan struct{})
@@ -150,6 +148,10 @@ func (t *Throttler) Stop() {
 	t.Lock()
 	defer t.Unlock()
 
+	t.stop()
+}
+
+func (t *Throttler) stop() {
 	if t.stopped {
 		return
 	}
