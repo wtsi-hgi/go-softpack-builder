@@ -49,7 +49,7 @@ type Scheduler struct {
 // periodically.
 func NewScheduler(conf *config.Config, builder Builder) *Scheduler {
 	reindex := func() {
-		cmd := exec.Command("spack", "buildcache", "update-index", "--", conf.S3.BinaryCache) //nolint:gosec
+		cmd := exec.Command(conf.Spack.Path, "buildcache", "update-index", "--", conf.S3.BinaryCache) //nolint:gosec
 		out, err := cmd.CombinedOutput()
 
 		var outstr, errstr string

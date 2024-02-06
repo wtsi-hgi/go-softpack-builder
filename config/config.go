@@ -50,6 +50,7 @@ type Config struct {
 		FinalImage      string  `yaml:"finalImage"`
 		ProcessorTarget string  `yaml:"processorTarget"`
 		ReindexHours    float64 `yaml:"reindexHours"`
+		Path            string  `yaml:"path"`
 	} `yaml:"spack"`
 	CoreURL      string `yaml:"coreURL"`
 	ListenURL    string `yaml:"listenURL"`
@@ -73,6 +74,10 @@ func Parse(r io.Reader) (*Config, error) {
 		if _, err := url.Parse(c.CoreURL); err != nil {
 			return nil, fmt.Errorf("invalid coreURL: %w", err)
 		}
+	}
+
+	if c.Spack.Path == "" {
+		c.Spack.Path = "spack"
 	}
 
 	return c, nil

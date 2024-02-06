@@ -16,6 +16,8 @@ spack:
   buildImage: "spack/ubuntu-jammy:latest"
   finalImage: "ubuntu:22.04"
   processorTarget: "x86_64_v4"
+  reindexHours: 24
+  path: "/usr/bin/spack"
 
 coreURL: "http://x.y.z:9837/softpack"
 listenURL: "localhost:2456"

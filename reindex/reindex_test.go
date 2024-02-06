@@ -87,6 +87,7 @@ func TestReindex(t *testing.T) {
 		conf.S3.BinaryCache = tdir
 		conf.S3.BuildBase = "some_path"
 		conf.Spack.ReindexHours = (10 * time.Millisecond).Hours()
+		conf.Spack.Path = "spack"
 
 		fb := &fakeBuilder{}
 
@@ -137,15 +138,21 @@ func TestReindex(t *testing.T) {
 			getIndex(cacheDir, started)
 			So(logWriter.String(), ShouldContainSubstring, `level=ERROR msg="spack reindex failed"`)
 			So(logWriter.String(), ShouldContainSubstring, "file:///bad/build_cache: [Errno 2] No such file or directory")
+		})
 
-			Convey("including when spack isn't available", func() {
-				os.Setenv("PATH", "/garbage")
-				started := fb.buildCalled()
+		Convey("An error is logged when Spack isn't available", func() {
+			var logWriter internal.ConcurrentStringBuilder
+			slog.SetDefault(slog.New(slog.NewTextHandler(&logWriter, nil)))
 
-				getIndex(cacheDir, started)
-				So(logWriter.String(), ShouldContainSubstring, `level=ERROR msg="spack reindex failed"`)
-				So(logWriter.String(), ShouldContainSubstring, "executable file not found in $PATH")
-			})
+			conf.Spack.Path = "/non-existent"
+			s := NewScheduler(&conf, fb)
+			s.Start()
+			started := fb.buildCalled()
+			defer s.Stop()
+
+			getIndex(cacheDir, started)
+			So(logWriter.String(), ShouldContainSubstring, `level=ERROR msg="spack reindex failed"`)
+			So(logWriter.String(), ShouldContainSubstring, "fork/exec /non-existent: no such file or directory")
 		})
 	})
 }
