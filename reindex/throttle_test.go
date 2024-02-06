@@ -39,9 +39,9 @@ func TestThrottle(t *testing.T) {
 			calls <- time.Now()
 		}
 
-		periodms := 10
+		periodms := 100
 		period := time.Duration(periodms) * time.Millisecond
-		tolerance := 2 * time.Millisecond
+		tolerance := 10 * time.Millisecond
 
 		Convey("Throttle lets you do things only once every period of time", func() {
 			started := time.Now()
@@ -69,7 +69,7 @@ func TestThrottle(t *testing.T) {
 		})
 
 		Convey("Throttle executes long-running tasks with no overlap, after the next full period", func() {
-			callLength = 15 * time.Millisecond
+			callLength = 150 * time.Millisecond
 			So(callLength, ShouldBeGreaterThan, period)
 			started := time.Now()
 

@@ -117,8 +117,6 @@ func (m *mockWR) Run(cmd string) error {
 
 	m.cmd = cmd
 
-	<-time.After(10 * time.Millisecond)
-
 	return nil
 }
 
