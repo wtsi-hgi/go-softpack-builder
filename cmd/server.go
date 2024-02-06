@@ -32,6 +32,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/wtsi-hgi/go-softpack-builder/build"
 	"github.com/wtsi-hgi/go-softpack-builder/config"
+	"github.com/wtsi-hgi/go-softpack-builder/reindex"
 	"github.com/wtsi-hgi/go-softpack-builder/server"
 )
 
@@ -75,6 +76,7 @@ spack:
   buildImage: "spack/ubuntu-jammy:v0.20.1"
   finalImage: "ubuntu:22.04"
   processorTarget: "x86_64_v3"
+  reindexHours: 24
 
 coreURL: "http://x.y.z:9837/upload"
 listenURL: "0.0.0.0:2456"
@@ -116,7 +118,13 @@ Where:
 - coreURL is the URL of a running softpack core service, that will be used to
   send build artefacts to so that it can store them in a softpack environements
   git repository and make them visible on the softpack frontend.
-- listenURL is the address gsb will listen on for new build requests from core.`,
+- listenURL is the address gsb will listen on for new build requests from core.
+
+It also runs spack buildcache update-index (examine all files in S3 and produce
+a new index.json summarising the available cached builds). It does this at most
+once every reindexHours hours, but only if there has been a new build in the
+past reindexHours, and only if a reindex is not still ongoing.
+`,
 	Run: func(_ *cobra.Command, _ []string) {
 		if debug {
 			h := slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
@@ -131,6 +139,10 @@ Where:
 		if err != nil {
 			die("could not create a builder: %s", err)
 		}
+
+		s := reindex.NewScheduler(conf, b)
+		s.Start()
+		defer s.Stop()
 
 		err = http.ListenAndServe(conf.ListenURL, server.New(b)) //nolint:gosec
 		if err != nil {

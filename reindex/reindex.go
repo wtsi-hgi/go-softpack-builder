@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2023 Genome Research Ltd.
+ * Copyright (c) 2024 Genome Research Ltd.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -21,46 +21,62 @@
  * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  ******************************************************************************/
 
-package internal
+package reindex
 
 import (
-	"embed"
+	"log/slog"
+	"os/exec"
 	"strings"
-	"sync"
+	"time"
+
+	"github.com/wtsi-hgi/go-softpack-builder/config"
 )
 
-//go:embed testdata
-var TestData embed.FS
-
-// ConcurrentStringBuilder should be used when testing slog logging:
-//
-//	var logWriter internal.ConcurrentStringBuilder
-//	slog.SetDefault(slog.New(slog.NewTextHandler(&logWriter, nil)))
-type ConcurrentStringBuilder struct {
-	mu sync.RWMutex
-	strings.Builder
+// Builder can tell us when a build takes place.
+type Builder interface {
+	SetPostBuildCallback(func())
 }
 
-// Write is for implementing io.Writer.
-func (c *ConcurrentStringBuilder) Write(p []byte) (int, error) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	return c.Builder.Write(p)
+// Scheduler periodically updates the Spack buildcache index.
+type Scheduler struct {
+	*Throttler
+	conf    *config.Config
+	builder Builder
 }
 
-// WriteString is for implementing io.Writer.
-func (c *ConcurrentStringBuilder) WriteString(str string) (int, error) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
+// NewScheduler returns a scheduler that can update the Spack buildcache index
+// periodically.
+func NewScheduler(conf *config.Config, builder Builder) *Scheduler {
+	reindex := func() {
+		cmd := exec.Command(conf.Spack.Path, "buildcache", "update-index", "--", conf.S3.BinaryCache) //nolint:gosec
+		out, err := cmd.CombinedOutput()
 
-	return c.Builder.WriteString(str)
+		var outstr, errstr string
+
+		if out != nil {
+			outstr = string(out)
+		}
+
+		if err != nil {
+			errstr = err.Error()
+		}
+
+		if err != nil || strings.Contains(outstr, "Error") {
+			slog.Error("spack reindex failed", "err", errstr, "out", outstr)
+		}
+	}
+
+	s := &Scheduler{
+		Throttler: NewThrottle(reindex, hoursToDuration(conf.Spack.ReindexHours), true),
+		conf:      conf,
+		builder:   builder,
+	}
+
+	builder.SetPostBuildCallback(s.Signal)
+
+	return s
 }
 
-// String returns the current logs messages as a string.
-func (c *ConcurrentStringBuilder) String() string {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-
-	return c.Builder.String()
+func hoursToDuration(hours float64) time.Duration {
+	return time.Duration(hours * float64(time.Hour))
 }

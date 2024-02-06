@@ -33,14 +33,17 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	. "github.com/smartystreets/goconvey/convey"
 	"github.com/wtsi-hgi/go-softpack-builder/config"
+	"github.com/wtsi-hgi/go-softpack-builder/internal"
 	"github.com/wtsi-hgi/go-softpack-builder/internal/gitmock"
 	"github.com/wtsi-hgi/go-softpack-builder/wr"
 )
@@ -114,6 +117,8 @@ func (m *mockWR) Run(cmd string) error {
 	}
 
 	m.cmd = cmd
+
+	<-time.After(10 * time.Millisecond)
 
 	return nil
 }
@@ -189,32 +194,6 @@ func (m *mockCore) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-type concurrentStringBuilder struct {
-	mu sync.RWMutex
-	strings.Builder
-}
-
-func (c *concurrentStringBuilder) Write(p []byte) (int, error) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	return c.Builder.Write(p)
-}
-
-func (c *concurrentStringBuilder) WriteString(str string) (int, error) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	return c.Builder.WriteString(str)
-}
-
-func (c *concurrentStringBuilder) String() string {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-
-	return c.Builder.String()
-}
-
 func TestBuilder(t *testing.T) {
 	Convey("Given binary cache and spack repo details and a Definition", t, func() {
 		ms3 := &mockS3{}
@@ -241,6 +220,13 @@ func TestBuilder(t *testing.T) {
 			runner:              mwr,
 			runningEnvironments: make(map[string]bool),
 		}
+
+		var bcbCount atomic.Uint64
+		bcb := func() {
+			bcbCount.Add(1)
+		}
+
+		builder.SetPostBuildCallback(bcb)
 
 		def := getExampleDefinition()
 
@@ -285,10 +271,10 @@ EOF
 	spack config add "config:install_tree:padded_length:128"
 	spack -e . concretize
 	spack -e . install --fail-fast || {
-		spack -e . buildcache push -a --rebuild-index s3cache
+		spack -e . buildcache push -a s3cache
 		false
 	}
-	spack -e . buildcache push -a --rebuild-index s3cache
+	spack -e . buildcache push -a s3cache
 	spack gc -y
 	spack env activate --sh -d . >> /opt/spack-environment/environment_modifications.sh
 
@@ -347,7 +333,7 @@ Stage: final
 			})
 		})
 
-		var logWriter concurrentStringBuilder
+		var logWriter internal.ConcurrentStringBuilder
 		slog.SetDefault(slog.New(slog.NewTextHandler(&logWriter, nil)))
 
 		Convey("You can do a Build", func() {
@@ -359,6 +345,8 @@ Stage: final
 			ms3.exes = "xxhsum\nxxh32sum\nxxh64sum\nxxh128sum\nR\nRscript\npython\n"
 			err := builder.Build(def)
 			So(err, ShouldBeNil)
+
+			So(bcbCount.Load(), ShouldEqual, 0)
 
 			So(ms3.def, ShouldEqual, "groups/hgi/xxhash/0.8.1/singularity.def")
 			So(ms3.data, ShouldContainSubstring, "specs:\n  - xxhash@0.8.1 arch=None-None-x86_64_v4\n"+
@@ -470,12 +458,16 @@ packages:
 
 			So(ms3.softpackYML, ShouldEqual, expectedSoftpackYaml)
 			So(ms3.readme, ShouldContainSubstring, expectedReadmeContent)
+
+			So(bcbCount.Load(), ShouldEqual, 1)
 		})
 
 		Convey("Build returns an error if the upload fails", func() {
 			ms3.fail = true
 			err := builder.Build(def)
 			So(err, ShouldNotBeNil)
+
+			So(bcbCount.Load(), ShouldEqual, 0)
 		})
 
 		Convey("Build logs an error if the run fails", func() {
@@ -496,29 +488,41 @@ packages:
 			data, ok := mc.getFile("groups/hgi/xxhash-0.8.1/" + BuilderOut)
 			So(ok, ShouldBeTrue)
 			So(data, ShouldContainSubstring, "output")
+
+			So(bcbCount.Load(), ShouldEqual, 1)
 		})
 
 		Convey("You can't run the same build simultaneously", func() {
+			_, err := exec.LookPath("wr")
+			if err != nil {
+				SkipConvey("skipping a builder test since wr not in PATH", func() {})
+
+				return
+			}
+
 			conf.Module.ModuleInstallDir = t.TempDir()
 			conf.Module.ScriptsInstallDir = t.TempDir()
 			conf.Module.WrapperScript = "/path/to/wrapper"
 			conf.Module.LoadPath = moduleLoadPrefix
 			ms3.exes = "xxhsum\nxxh32sum\nxxh64sum\nxxh128sum\n"
 
+			ch := make(chan bool, 1)
 			mr := &modifyRunner{
 				cmd:    "sleep 2s",
 				Runner: wr.New("development"),
-				ch:     make(chan bool, 1),
+				ch:     ch,
 			}
 
 			builder.runner = mr
 
-			err := builder.Build(def)
+			err = builder.Build(def)
 			So(err, ShouldBeNil)
 
 			err = builder.Build(def)
 			So(err, ShouldNotBeNil)
 			So(err, ShouldEqual, ErrEnvironmentBuilding)
+
+			<-ch
 		})
 
 		Convey("When the Core doesn't respond we get a meaningful error", func() {
@@ -560,6 +564,8 @@ packages:
 			expectedLog = "\"Async part of build failed\" err=\"an error\\n\""
 
 			So(logWriter.String(), ShouldContainSubstring, expectedLog)
+
+			So(bcbCount.Load(), ShouldEqual, 2)
 		})
 	})
 }

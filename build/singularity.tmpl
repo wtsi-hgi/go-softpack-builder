@@ -32,10 +32,10 @@ EOF
 	spack config add "config:install_tree:padded_length:128"
 	spack -e . concretize
 	spack -e . install --fail-fast || {
-		spack -e . buildcache push -a --rebuild-index s3cache
+		spack -e . buildcache push -a s3cache
 		false
 	}
-	spack -e . buildcache push -a --rebuild-index s3cache
+	spack -e . buildcache push -a s3cache
 	spack gc -y
 	spack env activate --sh -d . >> /opt/spack-environment/environment_modifications.sh
 
