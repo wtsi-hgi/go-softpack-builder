@@ -39,10 +39,9 @@ type Builder interface {
 
 // Scheduler periodically updates the Spack buildcache index.
 type Scheduler struct {
-	throt   *Throttler
+	*Throttler
 	conf    *config.Config
 	builder Builder
-	quit    chan struct{}
 }
 
 // NewScheduler returns a scheduler that can update the Spack buildcache index
@@ -68,10 +67,9 @@ func NewScheduler(conf *config.Config, builder Builder) *Scheduler {
 	}
 
 	s := &Scheduler{
-		throt:   NewThrottle(reindex, hoursToDuration(conf.Spack.ReindexHours), true),
-		conf:    conf,
-		builder: builder,
-		quit:    make(chan struct{}),
+		Throttler: NewThrottle(reindex, hoursToDuration(conf.Spack.ReindexHours), true),
+		conf:      conf,
+		builder:   builder,
 	}
 
 	builder.SetPostBuildCallback(s.Signal)
@@ -81,22 +79,4 @@ func NewScheduler(conf *config.Config, builder Builder) *Scheduler {
 
 func hoursToDuration(hours float64) time.Duration {
 	return time.Duration(hours * float64(time.Hour))
-}
-
-// Start starts the scheduler, calling `spack buildcache update-index`
-// immediately.
-func (s *Scheduler) Start() {
-	s.throt.Start()
-}
-
-// Signal signals that a build has happened and a reindex is now needed.
-func (s *Scheduler) Signal() {
-	s.throt.Signal()
-}
-
-// Stop prevents future invocations of `spack buildcache update-index` (but
-// does not interrupt an existing process).
-func (s *Scheduler) Stop() {
-	s.throt.Stop()
-	close(s.quit)
 }
