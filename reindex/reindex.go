@@ -30,8 +30,6 @@ import (
 	"github.com/wtsi-hgi/go-softpack-builder/config"
 )
 
-const reindexHoursDividerForCheckingLastBuildTime = 2
-
 // Builder can tell us when a build takes place.
 type Builder interface {
 	SetPostBuildCallback(func())
