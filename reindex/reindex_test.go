@@ -28,7 +28,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strings"
 	"testing"
 	"time"
 
@@ -36,6 +35,7 @@ import (
 	. "github.com/smartystreets/goconvey/convey"
 	"github.com/wtsi-hgi/go-softpack-builder/build"
 	"github.com/wtsi-hgi/go-softpack-builder/config"
+	"github.com/wtsi-hgi/go-softpack-builder/internal"
 )
 
 const userPerms = 0700
@@ -125,8 +125,8 @@ func TestReindex(t *testing.T) {
 		})
 
 		Convey("Spack errors are logged", func() {
-			logWriter := new(strings.Builder)
-			slog.SetDefault(slog.New(slog.NewTextHandler(logWriter, nil)))
+			var logWriter internal.ConcurrentStringBuilder
+			slog.SetDefault(slog.New(slog.NewTextHandler(&logWriter, nil)))
 
 			conf.S3.BinaryCache = "/bad"
 			s := NewScheduler(&conf, fb)

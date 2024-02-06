@@ -42,6 +42,7 @@ import (
 
 	. "github.com/smartystreets/goconvey/convey"
 	"github.com/wtsi-hgi/go-softpack-builder/config"
+	"github.com/wtsi-hgi/go-softpack-builder/internal"
 	"github.com/wtsi-hgi/go-softpack-builder/internal/gitmock"
 	"github.com/wtsi-hgi/go-softpack-builder/wr"
 )
@@ -192,32 +193,6 @@ func (m *mockCore) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-type concurrentStringBuilder struct {
-	mu sync.RWMutex
-	strings.Builder
-}
-
-func (c *concurrentStringBuilder) Write(p []byte) (int, error) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	return c.Builder.Write(p)
-}
-
-func (c *concurrentStringBuilder) WriteString(str string) (int, error) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	return c.Builder.WriteString(str)
-}
-
-func (c *concurrentStringBuilder) String() string {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-
-	return c.Builder.String()
-}
-
 func TestBuilder(t *testing.T) {
 	Convey("Given binary cache and spack repo details and a Definition", t, func() {
 		ms3 := &mockS3{}
@@ -357,7 +332,7 @@ Stage: final
 			})
 		})
 
-		var logWriter concurrentStringBuilder
+		var logWriter internal.ConcurrentStringBuilder
 		slog.SetDefault(slog.New(slog.NewTextHandler(&logWriter, nil)))
 
 		Convey("You can do a Build", func() {
