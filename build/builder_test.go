@@ -33,6 +33,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -116,6 +117,8 @@ func (m *mockWR) Run(cmd string) error {
 	}
 
 	m.cmd = cmd
+
+	<-time.After(10 * time.Millisecond)
 
 	return nil
 }
@@ -490,26 +493,36 @@ packages:
 		})
 
 		Convey("You can't run the same build simultaneously", func() {
+			_, err := exec.LookPath("wr")
+			if err != nil {
+				SkipConvey("skipping a builder test since wr not in PATH", func() {})
+
+				return
+			}
+
 			conf.Module.ModuleInstallDir = t.TempDir()
 			conf.Module.ScriptsInstallDir = t.TempDir()
 			conf.Module.WrapperScript = "/path/to/wrapper"
 			conf.Module.LoadPath = moduleLoadPrefix
 			ms3.exes = "xxhsum\nxxh32sum\nxxh64sum\nxxh128sum\n"
 
+			ch := make(chan bool, 1)
 			mr := &modifyRunner{
 				cmd:    "sleep 2s",
 				Runner: wr.New("development"),
-				ch:     make(chan bool, 1),
+				ch:     ch,
 			}
 
 			builder.runner = mr
 
-			err := builder.Build(def)
+			err = builder.Build(def)
 			So(err, ShouldBeNil)
 
 			err = builder.Build(def)
 			So(err, ShouldNotBeNil)
 			So(err, ShouldEqual, ErrEnvironmentBuilding)
+
+			<-ch
 		})
 
 		Convey("When the Core doesn't respond we get a meaningful error", func() {
