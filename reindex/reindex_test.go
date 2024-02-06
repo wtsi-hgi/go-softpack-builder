@@ -143,7 +143,7 @@ func TestReindex(t *testing.T) {
 				started := fb.buildCalled()
 
 				getIndex(cacheDir, started)
-				So(logWriter.String(), ShouldContainSubstring, `level=ERROR msg="could not run spack buildcache update-index"`)
+				So(logWriter.String(), ShouldContainSubstring, `level=ERROR msg="spack reindex failed"`)
 				So(logWriter.String(), ShouldContainSubstring, "executable file not found in $PATH")
 			})
 		})
