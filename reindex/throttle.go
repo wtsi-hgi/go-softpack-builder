@@ -32,11 +32,10 @@ import (
 type Throttler struct {
 	op             func()
 	period         time.Duration
-	requestedStop  chan struct{}
+	quit           chan struct{}
 	requriesSignal bool
 	started        bool
 	blocked        bool
-	stopped        bool
 	runner         *opRunner
 	sync.Mutex
 }
@@ -63,9 +62,8 @@ func (t *Throttler) Start() {
 		t.stop()
 	}
 
-	t.requestedStop = make(chan struct{})
+	t.quit = make(chan struct{})
 	t.started = true
-	t.stopped = false
 
 	go t.runEveryPeriod()
 }
@@ -85,7 +83,7 @@ func (t *Throttler) runEveryPeriod() {
 		case <-ticker.C:
 			t.runIfSignalled()
 
-		case <-t.requestedStop:
+		case <-t.quit:
 			return
 		}
 	}
@@ -152,11 +150,10 @@ func (t *Throttler) Stop() {
 }
 
 func (t *Throttler) stop() {
-	if t.stopped {
+	if !t.started {
 		return
 	}
 
-	close(t.requestedStop)
-	t.stopped = true
+	close(t.quit)
 	t.started = false
 }
