@@ -34,6 +34,7 @@ import (
 
 	"github.com/otiai10/copy"
 	. "github.com/smartystreets/goconvey/convey"
+	"github.com/wtsi-hgi/go-softpack-builder/build"
 	"github.com/wtsi-hgi/go-softpack-builder/config"
 )
 
@@ -49,6 +50,7 @@ func (f *fakeBuilder) SetPostBuildCallback(cb func()) {
 
 func (f *fakeBuilder) buildCalled() time.Time {
 	f.cb()
+
 	return time.Now()
 }
 
@@ -66,6 +68,10 @@ func TestReindex(t *testing.T) {
 
 		return
 	}
+
+	Convey("build.Builder implements our Builder interface", t, func() {
+		var _ Builder = (*build.Builder)(nil)
+	})
 
 	Convey("Given a conf, a builder and an unindexed spack binary cache", t, func() {
 		tdir := t.TempDir()

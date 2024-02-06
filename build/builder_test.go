@@ -36,6 +36,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -114,6 +115,8 @@ func (m *mockWR) Run(cmd string) error {
 	}
 
 	m.cmd = cmd
+
+	<-time.After(10 * time.Millisecond)
 
 	return nil
 }
@@ -242,6 +245,13 @@ func TestBuilder(t *testing.T) {
 			runningEnvironments: make(map[string]bool),
 		}
 
+		var bcbCount atomic.Uint64
+		bcb := func() {
+			bcbCount.Add(1)
+		}
+
+		builder.SetPostBuildCallback(bcb)
+
 		def := getExampleDefinition()
 
 		Convey("You can generate a singularity .def", func() {
@@ -360,6 +370,8 @@ Stage: final
 			err := builder.Build(def)
 			So(err, ShouldBeNil)
 
+			So(bcbCount.Load(), ShouldEqual, 0)
+
 			So(ms3.def, ShouldEqual, "groups/hgi/xxhash/0.8.1/singularity.def")
 			So(ms3.data, ShouldContainSubstring, "specs:\n  - xxhash@0.8.1 arch=None-None-x86_64_v4\n"+
 				"  - r-seurat@4 arch=None-None-x86_64_v4\n  - py-anndata@3.14 arch=None-None-x86_64_v4\n  view")
@@ -470,12 +482,16 @@ packages:
 
 			So(ms3.softpackYML, ShouldEqual, expectedSoftpackYaml)
 			So(ms3.readme, ShouldContainSubstring, expectedReadmeContent)
+
+			So(bcbCount.Load(), ShouldEqual, 1)
 		})
 
 		Convey("Build returns an error if the upload fails", func() {
 			ms3.fail = true
 			err := builder.Build(def)
 			So(err, ShouldNotBeNil)
+
+			So(bcbCount.Load(), ShouldEqual, 0)
 		})
 
 		Convey("Build logs an error if the run fails", func() {
@@ -496,6 +512,8 @@ packages:
 			data, ok := mc.getFile("groups/hgi/xxhash-0.8.1/" + BuilderOut)
 			So(ok, ShouldBeTrue)
 			So(data, ShouldContainSubstring, "output")
+
+			So(bcbCount.Load(), ShouldEqual, 1)
 		})
 
 		Convey("You can't run the same build simultaneously", func() {
@@ -560,6 +578,8 @@ packages:
 			expectedLog = "\"Async part of build failed\" err=\"an error\\n\""
 
 			So(logWriter.String(), ShouldContainSubstring, expectedLog)
+
+			So(bcbCount.Load(), ShouldEqual, 2)
 		})
 	})
 }
