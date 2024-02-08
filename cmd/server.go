@@ -135,7 +135,7 @@ past reindexHours, and only if a reindex is not still ongoing.
 
 		conf := getConfig()
 
-		b, err := build.New(conf)
+		b, err := build.New(conf, nil, nil)
 		if err != nil {
 			die("could not create a builder: %s", err)
 		}

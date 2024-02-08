@@ -15,6 +15,7 @@ import (
 	. "github.com/smartystreets/goconvey/convey"
 	"github.com/wtsi-hgi/go-softpack-builder/build"
 	"github.com/wtsi-hgi/go-softpack-builder/config"
+	"github.com/wtsi-hgi/go-softpack-builder/internal/core"
 )
 
 const groupsDir = "groups"
@@ -39,11 +40,11 @@ func TestRemove(t *testing.T) {
 
 		var response coreResponse
 
-		core := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		mockCore := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			json.NewEncoder(w).Encode(response) //nolint:errcheck
 		}))
 
-		conf.CoreURL = core.URL
+		conf.CoreURL = mockCore.URL
 
 		s3Mock := new(mockS3)
 
@@ -70,7 +71,7 @@ func TestRemove(t *testing.T) {
 			So(err, ShouldBeNil)
 
 			_, err = os.Stat(filepath.Join(conf.Module.ScriptsInstallDir, groupsDir,
-				group, env, version+build.ScriptsDirSuffix, build.ImageBasename))
+				group, env, version+build.ScriptsDirSuffix, core.ImageBasename))
 			So(err, ShouldBeNil)
 
 			removing := filepath.Join(conf.Module.ModuleInstallDir, groupsDir, group, env)
@@ -147,7 +148,7 @@ func createTestEnv(t *testing.T) (*config.Config, string, string, string) {
 	So(err, ShouldBeNil)
 	So(f.Close(), ShouldBeNil)
 
-	f, err = os.Create(filepath.Join(scriptsPath, build.ImageBasename))
+	f, err = os.Create(filepath.Join(scriptsPath, core.ImageBasename))
 	So(err, ShouldBeNil)
 
 	_, err = io.WriteString(f, "An Image File")

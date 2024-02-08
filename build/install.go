@@ -27,14 +27,15 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+
+	"github.com/wtsi-hgi/go-softpack-builder/internal/core"
 )
 
 const (
 	ScriptsDirSuffix = "-scripts"
 
-	ImageBasename = "singularity.sif"
-	perms         = 0755
-	flags         = os.O_EXCL | os.O_CREATE | os.O_WRONLY
+	perms = 0755
+	flags = os.O_EXCL | os.O_CREATE | os.O_WRONLY
 )
 
 func installModule(scriptInstallBase, moduleInstallBase string, def *Definition, module,
@@ -59,7 +60,7 @@ func installModule(scriptInstallBase, moduleInstallBase string, def *Definition,
 		return err
 	}
 
-	if err = installFile(image, filepath.Join(scriptsDir, ImageBasename)); err != nil {
+	if err = installFile(image, filepath.Join(scriptsDir, core.ImageBasename)); err != nil {
 		return err
 	}
 

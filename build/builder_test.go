@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2023 Genome Research Ltd.
+ * Copyright (c) 2023, 2024 Genome Research Ltd.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -25,18 +25,13 @@ package build
 
 import (
 	"crypto/sha256"
-	"errors"
 	"fmt"
 	"io"
 	"log/slog"
-	"net/http"
 	"net/http/httptest"
-	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strings"
-	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -44,84 +39,12 @@ import (
 	. "github.com/smartystreets/goconvey/convey"
 	"github.com/wtsi-hgi/go-softpack-builder/config"
 	"github.com/wtsi-hgi/go-softpack-builder/internal"
+	"github.com/wtsi-hgi/go-softpack-builder/internal/core"
 	"github.com/wtsi-hgi/go-softpack-builder/internal/gitmock"
 	"github.com/wtsi-hgi/go-softpack-builder/wr"
 )
 
-const ErrMock = Error("Mock error")
 const moduleLoadPrefix = "HGI/softpack"
-
-type mockS3 struct {
-	data        string
-	def         string
-	softpackYML string
-	readme      string
-	fail        bool
-	exes        string
-}
-
-func (m *mockS3) UploadData(data io.Reader, dest string) error {
-	if m.fail {
-		return ErrMock
-	}
-
-	buff, err := io.ReadAll(data)
-	if err != nil {
-		return err
-	}
-
-	switch filepath.Ext(dest) {
-	case ".def":
-		m.data = string(buff)
-		m.def = dest
-	case ".yml":
-		m.softpackYML = string(buff)
-	case ".md":
-		m.readme = string(buff)
-	}
-
-	return nil
-}
-
-func (m *mockS3) OpenFile(source string) (io.ReadCloser, error) {
-	if filepath.Base(source) == ExesBasename {
-		return io.NopCloser(strings.NewReader(m.exes)), nil
-	}
-
-	if filepath.Base(source) == BuilderOut {
-		return io.NopCloser(strings.NewReader("output")), nil
-	}
-
-	if filepath.Base(source) == SpackLockFile {
-		return io.NopCloser(strings.NewReader(`{"_meta":{"file-type":"spack-lockfile","lockfile-version":5,"specfile-version":4},"spack":{"version":"0.21.0.dev0","type":"git","commit":"dac3b453879439fd733b03d0106cc6fe070f71f6"},"roots":[{"hash":"oibd5a4hphfkgshqiav4fdkvw4hsq4ek","spec":"xxhash arch=None-None-x86_64_v3"}, {"hash":"1ibd5a4hphfkgshqiav4fdkvw4hsq4e1","spec":"py-anndata arch=None-None-x86_64_v3"}, {"hash":"2ibd5a4hphfkgshqiav4fdkvw4hsq4e2","spec":"r-seurat arch=None-None-x86_64_v3"}],"concrete_specs":{"oibd5a4hphfkgshqiav4fdkvw4hsq4ek":{"name":"xxhash","version":"0.8.1","arch":{"platform":"linux","platform_os":"ubuntu22.04","target":"x86_64_v3"},"compiler":{"name":"gcc","version":"11.4.0"},"namespace":"builtin","parameters":{"build_system":"makefile","cflags":[],"cppflags":[],"cxxflags":[],"fflags":[],"ldflags":[],"ldlibs":[]},"package_hash":"wuj5b2kjnmrzhtjszqovcvgc3q46m6hoehmiccimi5fs7nmsw22a====","hash":"oibd5a4hphfkgshqiav4fdkvw4hsq4ek"},"2ibd5a4hphfkgshqiav4fdkvw4hsq4e2":{"name":"r-seurat","version":"4","arch":{"platform":"linux","platform_os":"ubuntu22.04","target":"x86_64_v3"},"compiler":{"name":"gcc","version":"11.4.0"},"namespace":"builtin","parameters":{"build_system":"makefile","cflags":[],"cppflags":[],"cxxflags":[],"fflags":[],"ldflags":[],"ldlibs":[]},"package_hash":"2uj5b2kjnmrzhtjszqovcvgc3q46m6hoehmiccimi5fs7nmsw222====","hash":"2ibd5a4hphfkgshqiav4fdkvw4hsq4e2"}, "1ibd5a4hphfkgshqiav4fdkvw4hsq4e1":{"name":"py-anndata","version":"3.14","arch":{"platform":"linux","platform_os":"ubuntu22.04","target":"x86_64_v3"},"compiler":{"name":"gcc","version":"11.4.0"},"namespace":"builtin","parameters":{"build_system":"makefile","cflags":[],"cppflags":[],"cxxflags":[],"fflags":[],"ldflags":[],"ldlibs":[]},"package_hash":"2uj5b2kjnmrzhtjszqovcvgc3q46m6hoehmiccimi5fs7nmsw222====","hash":"1ibd5a4hphfkgshqiav4fdkvw4hsq4e1"}}}`)), nil //nolint:lll
-	}
-
-	if filepath.Base(source) == ImageBasename {
-		return io.NopCloser(strings.NewReader("image")), nil
-	}
-
-	return nil, io.ErrUnexpectedEOF
-}
-
-type mockWR struct {
-	ch   chan struct{}
-	cmd  string
-	fail bool
-}
-
-func (m *mockWR) Run(cmd string) error {
-	defer close(m.ch)
-
-	if m.fail {
-		return ErrMock
-	}
-
-	m.cmd = cmd
-
-	<-time.After(10 * time.Millisecond)
-
-	return nil
-}
 
 type modifyRunner struct {
 	cmd string
@@ -136,69 +59,11 @@ func (m *modifyRunner) Run(_ string) error {
 	return err
 }
 
-type mockCore struct {
-	mu    sync.RWMutex
-	err   error
-	files map[string]string
-}
-
-func (m *mockCore) setFile(filename, contents string) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	m.files[filename] = contents
-}
-
-func (m *mockCore) getFile(filename string) (string, bool) {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-
-	contents, ok := m.files[filename]
-
-	return contents, ok
-}
-
-func (m *mockCore) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if m.err != nil {
-		http.Error(w, m.err.Error(), http.StatusInternalServerError)
-
-		return
-	}
-
-	mr, err := r.MultipartReader()
-	if err != nil {
-		return
-	}
-
-	envPath, err := url.QueryUnescape(r.URL.RawQuery)
-	if err != nil {
-		return
-	}
-
-	for {
-		p, err := mr.NextPart()
-		if errors.Is(err, io.EOF) {
-			break
-		} else if err != nil {
-			return
-		}
-
-		name := p.FileName()
-
-		buf, err := io.ReadAll(p)
-		if err != nil {
-			return
-		}
-
-		m.setFile(filepath.Join(envPath, name), string(buf))
-	}
-}
-
 func TestBuilder(t *testing.T) {
 	Convey("Given binary cache and spack repo details and a Definition", t, func() {
-		ms3 := &mockS3{}
-		mwr := &mockWR{ch: make(chan struct{})}
-		mc := &mockCore{files: make(map[string]string)}
+		ms3 := &internal.MockS3{}
+		mwr := &internal.MockWR{Ch: make(chan struct{})}
+		mc := &core.MockCore{Files: make(map[string]string)}
 		msc := httptest.NewServer(mc)
 
 		gm, commitHash := gitmock.New()
@@ -214,12 +79,8 @@ func TestBuilder(t *testing.T) {
 		conf.Spack.FinalImage = "ubuntu:22.04"
 		conf.Spack.ProcessorTarget = "x86_64_v4"
 
-		builder := &Builder{
-			config:              &conf,
-			s3:                  ms3,
-			runner:              mwr,
-			runningEnvironments: make(map[string]bool),
-		}
+		builder, err := New(&conf, ms3, mwr)
+		So(err, ShouldBeNil)
 
 		var bcbCount atomic.Uint64
 		bcb := func() {
@@ -342,25 +203,25 @@ Stage: final
 			conf.Module.WrapperScript = "/path/to/wrapper"
 			conf.Module.LoadPath = moduleLoadPrefix
 			conf.Spack.ProcessorTarget = "x86_64_v4"
-			ms3.exes = "xxhsum\nxxh32sum\nxxh64sum\nxxh128sum\nR\nRscript\npython\n"
+			ms3.Exes = "xxhsum\nxxh32sum\nxxh64sum\nxxh128sum\nR\nRscript\npython\n"
 			err := builder.Build(def)
 			So(err, ShouldBeNil)
 
 			So(bcbCount.Load(), ShouldEqual, 0)
 
-			So(ms3.def, ShouldEqual, "groups/hgi/xxhash/0.8.1/singularity.def")
-			So(ms3.data, ShouldContainSubstring, "specs:\n  - xxhash@0.8.1 arch=None-None-x86_64_v4\n"+
+			So(ms3.Def, ShouldEqual, "groups/hgi/xxhash/0.8.1/singularity.def")
+			So(ms3.Data, ShouldContainSubstring, "specs:\n  - xxhash@0.8.1 arch=None-None-x86_64_v4\n"+
 				"  - r-seurat@4 arch=None-None-x86_64_v4\n  - py-anndata@3.14 arch=None-None-x86_64_v4\n  view")
 
-			<-mwr.ch
-			hash := fmt.Sprintf("%X", sha256.Sum256([]byte(ms3.data)))
-			So(mwr.cmd, ShouldContainSubstring, "echo doing build with hash "+hash+"; sudo singularity build")
+			<-mwr.Ch
+			hash := fmt.Sprintf("%X", sha256.Sum256([]byte(ms3.Data)))
+			So(mwr.Cmd, ShouldContainSubstring, "echo doing build with hash "+hash+"; sudo singularity build")
 
 			modulePath := filepath.Join(conf.Module.ModuleInstallDir,
 				def.EnvironmentPath, def.EnvironmentName, def.EnvironmentVersion)
 			scriptsPath := filepath.Join(conf.Module.ScriptsInstallDir,
 				def.EnvironmentPath, def.EnvironmentName, def.EnvironmentVersion+ScriptsDirSuffix)
-			imagePath := filepath.Join(scriptsPath, ImageBasename)
+			imagePath := filepath.Join(scriptsPath, core.ImageBasename)
 			expectedExes := []string{"python", "R", "Rscript", "xxhsum", "xxh32sum", "xxh64sum", "xxh128sum"}
 
 			expectedFiles := []string{modulePath, scriptsPath, imagePath}
@@ -441,29 +302,29 @@ packages:
 			expectedReadmeContent := "module load " + moduleLoadPrefix + "/groups/hgi/xxhash/0.8.1"
 
 			for file, expectedData := range map[string]string{
-				SoftpackYaml:           expectedSoftpackYaml,
-				moduleForCoreBasename:  "module-whatis",
-				SingularityDefBasename: "specs:\n  - xxhash@0.8.1 arch=None-None-x86_64_v4",
-				SpackLockFile:          `"concrete_specs":`,
-				BuilderOut:             "output",
-				UsageBasename:          expectedReadmeContent,
+				core.SoftpackYaml:           expectedSoftpackYaml,
+				core.ModuleForCoreBasename:  "module-whatis",
+				core.SingularityDefBasename: "specs:\n  - xxhash@0.8.1 arch=None-None-x86_64_v4",
+				core.SpackLockFile:          `"concrete_specs":`,
+				core.BuilderOut:             "output",
+				core.UsageBasename:          expectedReadmeContent,
 			} {
-				data, okg := mc.getFile("groups/hgi/xxhash-0.8.1/" + file)
+				data, okg := mc.GetFile("groups/hgi/xxhash-0.8.1/" + file)
 				So(okg, ShouldBeTrue)
 				So(data, ShouldContainSubstring, expectedData)
 			}
 
-			_, ok = mc.getFile("groups/hgi/xxhash-0.8.1/" + ImageBasename)
+			_, ok = mc.GetFile("groups/hgi/xxhash-0.8.1/" + core.ImageBasename)
 			So(ok, ShouldBeFalse)
 
-			So(ms3.softpackYML, ShouldEqual, expectedSoftpackYaml)
-			So(ms3.readme, ShouldContainSubstring, expectedReadmeContent)
+			So(ms3.SoftpackYML, ShouldEqual, expectedSoftpackYaml)
+			So(ms3.Readme, ShouldContainSubstring, expectedReadmeContent)
 
 			So(bcbCount.Load(), ShouldEqual, 1)
 		})
 
 		Convey("Build returns an error if the upload fails", func() {
-			ms3.fail = true
+			ms3.Fail = true
 			err := builder.Build(def)
 			So(err, ShouldNotBeNil)
 
@@ -471,11 +332,11 @@ packages:
 		})
 
 		Convey("Build logs an error if the run fails", func() {
-			mwr.fail = true
+			mwr.Fail = true
 			err := builder.Build(def)
 			So(err, ShouldBeNil)
 
-			<-mwr.ch
+			<-mwr.Ch
 
 			ok := waitFor(func() bool {
 				return logWriter.String() != ""
@@ -485,7 +346,7 @@ packages:
 			So(logWriter.String(), ShouldContainSubstring,
 				"msg=\"Async part of build failed\" err=\"Mock error\" s3Path=some_path/groups/hgi/xxhash/0.8.1")
 
-			data, ok := mc.getFile("groups/hgi/xxhash-0.8.1/" + BuilderOut)
+			data, ok := mc.GetFile("groups/hgi/xxhash-0.8.1/" + core.BuilderOut)
 			So(ok, ShouldBeTrue)
 			So(data, ShouldContainSubstring, "output")
 
@@ -504,7 +365,7 @@ packages:
 			conf.Module.ScriptsInstallDir = t.TempDir()
 			conf.Module.WrapperScript = "/path/to/wrapper"
 			conf.Module.LoadPath = moduleLoadPrefix
-			ms3.exes = "xxhsum\nxxh32sum\nxxh64sum\nxxh128sum\n"
+			ms3.Exes = "xxhsum\nxxh32sum\nxxh64sum\nxxh128sum\n"
 
 			ch := make(chan bool, 1)
 			mr := &modifyRunner{
@@ -531,7 +392,7 @@ packages:
 			conf.Module.ScriptsInstallDir = t.TempDir()
 			conf.Module.WrapperScript = "/path/to/wrapper"
 			conf.Module.LoadPath = moduleLoadPrefix
-			ms3.exes = "xxhsum\nxxh32sum\nxxh64sum\nxxh128sum\n"
+			ms3.Exes = "xxhsum\nxxh32sum\nxxh64sum\nxxh128sum\n"
 
 			err := builder.Build(def)
 			So(err, ShouldBeNil)
@@ -546,10 +407,10 @@ packages:
 			So(logWriter.String(), ShouldContainSubstring, expectedLog)
 
 			conf.CoreURL = msc.URL
-			mc.err = Error("an error")
+			mc.Err = internal.Error("an error")
 
 			logWriter.Reset()
-			mwr.ch = make(chan struct{})
+			mwr.Ch = make(chan struct{})
 			conf.Module.ModuleInstallDir = t.TempDir()
 			conf.Module.ScriptsInstallDir = t.TempDir()
 
