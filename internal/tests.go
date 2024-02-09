@@ -71,6 +71,8 @@ func (c *ConcurrentStringBuilder) String() string {
 	return c.Builder.String()
 }
 
+// MockS3 can be used to test a build.Builder by implementing the build.S3
+// interface.
 type MockS3 struct {
 	Data        string
 	Def         string
@@ -82,6 +84,7 @@ type MockS3 struct {
 
 const ErrMock = Error("Mock error")
 
+// UploadData implements the build.S3 interface.
 func (m *MockS3) UploadData(data io.Reader, dest string) error {
 	if m.Fail {
 		return ErrMock
@@ -105,6 +108,7 @@ func (m *MockS3) UploadData(data io.Reader, dest string) error {
 	return nil
 }
 
+// OpenFile implements the build.S3 interface.
 func (m *MockS3) OpenFile(source string) (io.ReadCloser, error) {
 	if filepath.Base(source) == core.ExesBasename {
 		return io.NopCloser(strings.NewReader(m.Exes)), nil
@@ -125,6 +129,7 @@ func (m *MockS3) OpenFile(source string) (io.ReadCloser, error) {
 	return nil, io.ErrUnexpectedEOF
 }
 
+// MockWR can be used to test a build.Builder without having real wr running.
 type MockWR struct {
 	Ch           chan struct{}
 	Cmd          string
@@ -132,6 +137,7 @@ type MockWR struct {
 	ReturnStatus wr.WRJobStatus
 }
 
+// Add implements build.Runner interface.
 func (m *MockWR) Add(cmd string) (string, error) {
 	defer close(m.Ch)
 
@@ -140,6 +146,7 @@ func (m *MockWR) Add(cmd string) (string, error) {
 	return "abc123", nil
 }
 
+// Wait implements build.Runner interface.
 func (m *MockWR) Wait(id string) (wr.WRJobStatus, error) {
 	<-time.After(10 * time.Millisecond)
 
@@ -150,6 +157,7 @@ func (m *MockWR) Wait(id string) (wr.WRJobStatus, error) {
 	return wr.WRJobStatusComplete, nil
 }
 
+// Status implements build.Runner interface.
 func (m *MockWR) Status(id string) (wr.WRJobStatus, error) {
 	return m.ReturnStatus, nil
 }
