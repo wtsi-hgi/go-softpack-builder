@@ -72,19 +72,8 @@ func TestServerMock(t *testing.T) {
 		handler := New(mb)
 		server := httptest.NewServer(handler)
 
-		resp, err := server.Client().Post(server.URL+"/environments/build", "application/json", //nolint:noctx
-			strings.NewReader(`
-{
-	"name": "users/user/myenv",
-	"version": "0.8.1",
-	"model": {
-		"description": "help text",
-		"packages": [{"name": "xxhash", "version": "0.8.1"}]
-	}
-}
-`))
-		So(err, ShouldBeNil)
-		So(resp.StatusCode, ShouldEqual, http.StatusOK)
+		postToBuildEndpoint(server, "users/user/myenv", "0.8.1")
+
 		So(mb.received[0], ShouldResemble, &build.Definition{
 			EnvironmentPath:    "users/user/",
 			EnvironmentName:    "myenv",
@@ -150,7 +139,7 @@ func TestServerMock(t *testing.T) {
 					OutputError: "error validating request: package names required\n",
 				},
 			} {
-				resp, err = server.Client().Post(server.URL+"/environments/build", "application/json", //nolint:noctx
+				resp, err := server.Client().Post(server.URL+endpointEnvsBuild, "application/json", //nolint:noctx
 					strings.NewReader(test.InputJSON))
 
 				So(err, ShouldBeNil)
@@ -163,7 +152,7 @@ func TestServerMock(t *testing.T) {
 
 		Convey("After which you can get the queued/building/built status for it", func() {
 			mb.requested = append(mb.requested, time.Now())
-			resp, err := server.Client().Get(server.URL + "/environments/status") //nolint:noctx
+			resp, err := server.Client().Get(server.URL + endpointEnvsStatus) //nolint:noctx
 			So(err, ShouldBeNil)
 			So(resp.StatusCode, ShouldEqual, http.StatusOK)
 			var statuses []build.Status
@@ -172,26 +161,12 @@ func TestServerMock(t *testing.T) {
 			So(len(statuses), ShouldEqual, 1)
 			So(statuses[0].Name, ShouldEqual, "users/user/myenv-0.8.1")
 			So(statuses[0].Requested, ShouldEqual, mb.requested[0])
-			// Requested: ,
-			// BuildStart: ,
-			// BuildDone: ,
 
-			resp, err = server.Client().Post(server.URL+"/environments/build", "application/json", //nolint:noctx
-				strings.NewReader(`
-{
-	"name": "users/user/myotherenv",
-	"version": "1",
-	"model": {
-		"description": "help text",
-		"packages": [{"name": "xxhash", "version": "0.8.1"}]
-	}
-}
-`))
-			So(err, ShouldBeNil)
-			So(resp.StatusCode, ShouldEqual, http.StatusOK)
+			postToBuildEndpoint(server, "users/user/myotherenv", "1")
+
 			mb.requested = append(mb.requested, time.Now())
 
-			resp, err = server.Client().Get(server.URL + "/environments/status") //nolint:noctx
+			resp, err = server.Client().Get(server.URL + endpointEnvsStatus) //nolint:noctx
 			So(err, ShouldBeNil)
 			So(resp.StatusCode, ShouldEqual, http.StatusOK)
 			statuses = []build.Status{}
@@ -206,7 +181,7 @@ func TestServerMock(t *testing.T) {
 }
 
 func TestServerReal(t *testing.T) {
-	Convey("WIth a real builder", t, func() {
+	Convey("With a real builder", t, func() {
 		ms3 := &internal.MockS3{}
 		mwr := &internal.MockWR{Ch: make(chan struct{})}
 		mc := &core.MockCore{Files: make(map[string]string)}
@@ -231,5 +206,39 @@ func TestServerReal(t *testing.T) {
 		handler := New(builder)
 		server := httptest.NewServer(handler)
 		So(server, ShouldNotBeNil)
+
+		buildSubmitted := time.Now()
+		postToBuildEndpoint(server, "users/user/myenv", "0.8.1")
+
+		Convey("you get a real status", func() {
+			resp, err := server.Client().Get(server.URL + endpointEnvsStatus) //nolint:noctx
+			So(err, ShouldBeNil)
+			So(resp.StatusCode, ShouldEqual, http.StatusOK)
+			var statuses []build.Status
+			err = json.NewDecoder(resp.Body).Decode(&statuses)
+			So(err, ShouldBeNil)
+			So(len(statuses), ShouldEqual, 1)
+			So(statuses[0].Name, ShouldEqual, "users/user/myenv-0.8.1")
+			So(statuses[0].Requested, ShouldHappenAfter, buildSubmitted)
+			So(statuses[0].BuildStart, ShouldHappenAfter, statuses[0].Requested)
+			// BuildDone: ,
+		})
 	})
+}
+
+func postToBuildEndpoint(server *httptest.Server, name, version string) {
+	resp, err := server.Client().Post(server.URL+endpointEnvsBuild, "application/json", //nolint:noctx
+		strings.NewReader(`
+{
+	"name": "`+name+`",
+	"version": "`+version+`",
+	"model": {
+		"description": "help text",
+		"packages": [{"name": "xxhash", "version": "0.8.1"}]
+	}
+}
+`))
+
+	So(err, ShouldBeNil)
+	So(resp.StatusCode, ShouldEqual, http.StatusOK)
 }

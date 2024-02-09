@@ -29,7 +29,6 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/wtsi-hgi/go-softpack-builder/internal/core"
 )
@@ -130,7 +129,7 @@ type MockWR struct {
 	Fail bool
 }
 
-func (m *MockWR) Run(cmd string) error {
+func (m *MockWR) Add(cmd string) error {
 	defer close(m.Ch)
 
 	if m.Fail {
@@ -139,7 +138,7 @@ func (m *MockWR) Run(cmd string) error {
 
 	m.Cmd = cmd
 
-	<-time.After(10 * time.Millisecond)
+	// <-time.After(10 * time.Millisecond)
 
 	return nil
 }

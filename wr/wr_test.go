@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2023 Genome Research Ltd.
+ * Copyright (c) 2023, 2024 Genome Research Ltd.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -75,10 +75,14 @@ func TestWR(t *testing.T) {
 		runner := New("development")
 
 		runner.memory = "100M"
+		runner.pollDuration = 10 * time.Millisecond
 
 		runArgs, repGrp := uniqueRunArgs("sleep 2s")
-		err := runner.Run(runArgs)
+		jobID, err := runner.Add(runArgs)
 		So(err, ShouldBeNil)
+		status, err := runner.Wait(jobID)
+		So(err, ShouldBeNil)
+		So(status, ShouldEqual, WRJobStatusComplete)
 		So(time.Since(now), ShouldBeGreaterThan, 2*time.Second)
 
 		cmd := exec.Command("wr", "status", "--deployment", runner.deployment, "-i", repGrp, "-o", "json") //nolint:gosec
@@ -92,13 +96,19 @@ func TestWR(t *testing.T) {
 		So(stderr.String(), ShouldBeBlank)
 		So(stdout.String(), ShouldContainSubstring, `"State":"complete"`)
 
-		err = runner.Run(runArgs)
+		jobID2, err := runner.Add(runArgs)
 		So(err, ShouldBeNil)
+		So(jobID2, ShouldEqual, jobID)
+		status, err = runner.Wait(jobID)
+		So(err, ShouldBeNil)
+		So(status, ShouldEqual, WRJobStatusComplete)
 
 		runArgs, _ = uniqueRunArgs("false")
-		err = runner.Run(runArgs)
-		So(err, ShouldNotBeNil)
-		So(err.Error(), ShouldEqual, "wr add failed: exit status 1")
+		jobID, err = runner.Add(runArgs)
+		So(err, ShouldBeNil)
+		status, err = runner.Wait(jobID)
+		So(err, ShouldBeNil)
+		So(status, ShouldEqual, WRJobStatusBuried)
 	})
 }
 

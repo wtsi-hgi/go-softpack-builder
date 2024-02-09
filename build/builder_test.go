@@ -52,8 +52,8 @@ type modifyRunner struct {
 	ch chan bool
 }
 
-func (m *modifyRunner) Run(_ string) error {
-	err := m.Runner.Run(m.cmd)
+func (m *modifyRunner) Add(_ string) error {
+	err := m.Runner.Add(m.cmd)
 	m.ch <- true
 
 	return err
