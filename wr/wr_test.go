@@ -69,7 +69,7 @@ func TestWR(t *testing.T) {
 		return
 	}
 
-	Convey("You can run a WR command", t, func() {
+	Convey("You can run a cmd via wr", t, func() {
 		now := time.Now()
 
 		runner := New("development")

@@ -29,8 +29,10 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/wtsi-hgi/go-softpack-builder/internal/core"
+	"github.com/wtsi-hgi/go-softpack-builder/wr"
 )
 
 //go:embed testdata
@@ -124,21 +126,30 @@ func (m *MockS3) OpenFile(source string) (io.ReadCloser, error) {
 }
 
 type MockWR struct {
-	Ch   chan struct{}
-	Cmd  string
-	Fail bool
+	Ch           chan struct{}
+	Cmd          string
+	Fail         bool
+	ReturnStatus wr.WRJobStatus
 }
 
-func (m *MockWR) Add(cmd string) error {
+func (m *MockWR) Add(cmd string) (string, error) {
 	defer close(m.Ch)
-
-	if m.Fail {
-		return ErrMock
-	}
 
 	m.Cmd = cmd
 
-	// <-time.After(10 * time.Millisecond)
+	return "abc123", nil
+}
 
-	return nil
+func (m *MockWR) Wait(id string) (wr.WRJobStatus, error) {
+	<-time.After(10 * time.Millisecond)
+
+	if m.Fail {
+		return wr.WRJobStatusBuried, ErrMock
+	}
+
+	return wr.WRJobStatusComplete, nil
+}
+
+func (m *MockWR) Status(id string) (wr.WRJobStatus, error) {
+	return m.ReturnStatus, nil
 }

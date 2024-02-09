@@ -52,11 +52,21 @@ type modifyRunner struct {
 	ch chan bool
 }
 
-func (m *modifyRunner) Add(_ string) error {
-	err := m.Runner.Add(m.cmd)
+func (m *modifyRunner) Add(_ string) (string, error) {
+	jobID, err := m.Runner.Add(m.cmd)
+
+	return jobID, err
+}
+
+func (m *modifyRunner) Wait(id string) (wr.WRJobStatus, error) {
+	status, err := m.Runner.Wait(id)
 	m.ch <- true
 
-	return err
+	return status, err
+}
+
+func (m *modifyRunner) Status(id string) (wr.WRJobStatus, error) {
+	return m.Runner.Status(id)
 }
 
 func TestBuilder(t *testing.T) {

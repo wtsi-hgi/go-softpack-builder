@@ -146,19 +146,18 @@ func (r *Runner) Wait(id string) (WRJobStatus, error) {
 	ticker := time.NewTicker(r.pollDuration)
 	defer ticker.Stop()
 
-	for {
-		select {
-		case <-ticker.C:
-			status, err := r.Status(id)
-			if err != nil {
-				return status, err
-			}
+	for range ticker.C {
+		status, err := r.Status(id)
+		if err != nil {
+			return status, err
+		}
 
-			if status == WRJobStatusInvalid || status == WRJobStatusBuried || status == WRJobStatusComplete {
-				return status, err
-			}
+		if status == WRJobStatusInvalid || status == WRJobStatusBuried || status == WRJobStatusComplete {
+			return status, err
 		}
 	}
+
+	return WRJobStatusInvalid, nil
 }
 
 // Status returns the status of the wr job with the given internal ID.

@@ -178,7 +178,9 @@ type S3 interface {
 }
 
 type Runner interface {
-	Add(deployment string) error
+	Add(deployment string) (string, error)
+	Wait(id string) (wr.WRJobStatus, error)
+	Status(id string) (wr.WRJobStatus, error)
 }
 
 // The status of an individual build – when it was requested, when it started
@@ -397,7 +399,12 @@ func (b *Builder) asyncBuild(def *Definition, wrInput, s3Path, singDef string) e
 	status := b.buildStatus(def)
 	status.BuildStart = time.Now()
 
-	err := b.runner.Add(wrInput)
+	jobID, err := b.runner.Add(wrInput)
+	if err != nil {
+		return err
+	}
+
+	_, err = b.runner.Wait(jobID)
 
 	b.postBuildMu.RLock()
 	if b.postBuild != nil {
