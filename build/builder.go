@@ -188,9 +188,9 @@ type Runner interface {
 // actually being built, and when its build finished.
 type Status struct {
 	Name       string
-	Requested  time.Time
-	BuildStart time.Time
-	BuildDone  time.Time
+	Requested  *time.Time
+	BuildStart *time.Time
+	BuildDone  *time.Time
 }
 
 // Builder lets you do builds given config, S3 and a wr runner.
@@ -317,9 +317,10 @@ func (b *Builder) buildStatus(def *Definition) *Status {
 
 	status, exists := b.statuses[name]
 	if !exists {
+		now := time.Now()
 		status = &Status{
 			Name:      name,
-			Requested: time.Now(),
+			Requested: &now,
 		}
 
 		b.statuses[name] = status
@@ -413,13 +414,15 @@ func (b *Builder) asyncBuild(def *Definition, wrInput, s3Path, singDef string) e
 	}
 
 	b.statusMu.Lock()
-	status.BuildStart = time.Now()
+	buildStart := time.Now()
+	status.BuildStart = &buildStart
 	b.statusMu.Unlock()
 
 	_, err = b.runner.Wait(jobID)
 
 	b.statusMu.Lock()
-	status.BuildDone = time.Now()
+	buildDone := time.Now()
+	status.BuildDone = &buildDone
 	b.statusMu.Unlock()
 
 	b.postBuildMu.RLock()

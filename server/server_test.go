@@ -58,7 +58,7 @@ func (m *mockBuilder) Status() []build.Status {
 	for i, def := range m.received {
 		statuses[i] = build.Status{
 			Name:      filepath.Join(def.EnvironmentPath, def.EnvironmentName) + "-" + def.EnvironmentVersion,
-			Requested: m.requested[i],
+			Requested: &m.requested[i],
 		}
 	}
 
@@ -160,7 +160,7 @@ func TestServerMock(t *testing.T) {
 			So(err, ShouldBeNil)
 			So(len(statuses), ShouldEqual, 1)
 			So(statuses[0].Name, ShouldEqual, "users/user/myenv-0.8.1")
-			So(statuses[0].Requested, ShouldEqual, mb.requested[0])
+			So(*statuses[0].Requested, ShouldHappenWithin, 0*time.Microsecond, mb.requested[0])
 
 			postToBuildEndpoint(server, "users/user/myotherenv", "1")
 
@@ -175,7 +175,7 @@ func TestServerMock(t *testing.T) {
 			So(len(statuses), ShouldEqual, 2)
 			So(statuses[0].Name, ShouldEqual, "users/user/myenv-0.8.1")
 			So(statuses[1].Name, ShouldEqual, "users/user/myotherenv-1")
-			So(statuses[1].Requested, ShouldEqual, mb.requested[1])
+			So(*statuses[1].Requested, ShouldHappenWithin, 0*time.Microsecond, mb.requested[1])
 		})
 	})
 }
@@ -215,23 +215,23 @@ func TestServerReal(t *testing.T) {
 			statuses := getTestStatuses(server)
 			So(len(statuses), ShouldEqual, 1)
 			So(statuses[0].Name, ShouldEqual, "users/user/myenv-0.8.1")
-			So(statuses[0].Requested, ShouldHappenAfter, buildSubmitted)
-			So(statuses[0].BuildStart.IsZero(), ShouldBeTrue)
-			So(statuses[0].BuildDone.IsZero(), ShouldBeTrue)
+			So(*statuses[0].Requested, ShouldHappenAfter, buildSubmitted)
+			So(statuses[0].BuildStart, ShouldBeNil)
+			So(statuses[0].BuildDone, ShouldBeNil)
 
 			runT := time.Now()
 			mwr.SetRunning()
 			<-time.After(2 * mockStatusPollInterval)
 			statuses = getTestStatuses(server)
 			So(len(statuses), ShouldEqual, 1)
-			So(statuses[0].Requested, ShouldHappenAfter, buildSubmitted)
-			buildStart := statuses[0].BuildStart
+			So(*statuses[0].Requested, ShouldHappenAfter, buildSubmitted)
+			buildStart := *statuses[0].BuildStart
 			So(buildStart, ShouldHappenAfter, runT)
-			So(statuses[0].BuildDone.IsZero(), ShouldBeTrue)
+			So(statuses[0].BuildDone, ShouldBeNil)
 
 			<-time.After(mwr.JobDuration)
 			statuses = getTestStatuses(server)
-			So(statuses[0].BuildDone, ShouldHappenAfter, buildStart)
+			So(*statuses[0].BuildDone, ShouldHappenAfter, buildStart)
 		})
 	})
 }
