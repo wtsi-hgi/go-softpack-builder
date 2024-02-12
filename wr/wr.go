@@ -119,16 +119,16 @@ func (r *Runner) Add(wrInput string) (string, error) {
 }
 
 func (r *Runner) runWRCmd(cmd *exec.Cmd) (string, error) {
-	var std bytes.Buffer
+	var stdout, stderr bytes.Buffer
 
-	cmd.Stdout = &std
-	cmd.Stderr = &std
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
 
 	err := cmd.Run()
 	if err != nil {
-		errStr := std.String()
+		errStr := stderr.String()
 		if !strings.Contains(errStr, "EROR") {
-			return errStr, nil
+			return strings.TrimSpace(stdout.String()), nil
 		}
 
 		if errStr == "" {
@@ -138,7 +138,7 @@ func (r *Runner) runWRCmd(cmd *exec.Cmd) (string, error) {
 		return "", Error{msg: errStr}
 	}
 
-	return strings.TrimSpace(std.String()), nil
+	return strings.TrimSpace(stdout.String()), nil
 }
 
 // WaitForRunning waits until the given wr job either starts running, or exits.
