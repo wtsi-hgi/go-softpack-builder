@@ -131,24 +131,59 @@ func (m *MockS3) OpenFile(source string) (io.ReadCloser, error) {
 
 // MockWR can be used to test a build.Builder without having real wr running.
 type MockWR struct {
-	Ch           chan struct{}
-	Cmd          string
-	Fail         bool
+	Ch                    chan struct{}
+	Cmd                   string
+	Fail                  bool
+	PollForStatusInterval time.Duration
+	JobDuration           time.Duration
+
+	sync.RWMutex
 	ReturnStatus wr.WRJobStatus
+}
+
+func NewMockWR(pollForStatusInterval, jobDuration time.Duration) *MockWR {
+	return &MockWR{
+		Ch:                    make(chan struct{}),
+		PollForStatusInterval: pollForStatusInterval,
+		JobDuration:           jobDuration,
+	}
 }
 
 // Add implements build.Runner interface.
 func (m *MockWR) Add(cmd string) (string, error) {
-	defer close(m.Ch)
-
 	m.Cmd = cmd
 
 	return "abc123", nil
 }
 
+// SetRunning should be used before waiting on Ch and if you need to test
+// BuildStart time in Status.
+func (m *MockWR) SetRunning() {
+	m.Lock()
+	defer m.Unlock()
+
+	m.ReturnStatus = wr.WRJobStatusRunning
+}
+
+// WaitForRunning implements build.Runner interface.
+func (m *MockWR) WaitForRunning(string) error {
+	for {
+		m.RLock()
+		rs := m.ReturnStatus
+		m.RUnlock()
+
+		if rs == wr.WRJobStatusRunning || rs == wr.WRJobStatusBuried || rs == wr.WRJobStatusComplete {
+			return nil
+		}
+
+		<-time.After(m.PollForStatusInterval)
+	}
+}
+
 // Wait implements build.Runner interface.
-func (m *MockWR) Wait(id string) (wr.WRJobStatus, error) {
-	<-time.After(10 * time.Millisecond)
+func (m *MockWR) Wait(string) (wr.WRJobStatus, error) {
+	defer close(m.Ch)
+	<-time.After(m.JobDuration)
 
 	if m.Fail {
 		return wr.WRJobStatusBuried, ErrMock
@@ -158,6 +193,9 @@ func (m *MockWR) Wait(id string) (wr.WRJobStatus, error) {
 }
 
 // Status implements build.Runner interface.
-func (m *MockWR) Status(id string) (wr.WRJobStatus, error) {
+func (m *MockWR) Status(string) (wr.WRJobStatus, error) {
+	m.RLock()
+	defer m.RUnlock()
+
 	return m.ReturnStatus, nil
 }

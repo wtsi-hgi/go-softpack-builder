@@ -72,7 +72,7 @@ func (m *modifyRunner) Status(id string) (wr.WRJobStatus, error) {
 func TestBuilder(t *testing.T) {
 	Convey("Given binary cache and spack repo details and a Definition", t, func() {
 		ms3 := &internal.MockS3{}
-		mwr := &internal.MockWR{Ch: make(chan struct{})}
+		mwr := internal.NewMockWR(1*time.Millisecond, 10*time.Millisecond)
 		mc := &core.MockCore{Files: make(map[string]string)}
 		msc := httptest.NewServer(mc)
 
@@ -223,6 +223,7 @@ Stage: final
 			So(ms3.Data, ShouldContainSubstring, "specs:\n  - xxhash@0.8.1 arch=None-None-x86_64_v4\n"+
 				"  - r-seurat@4 arch=None-None-x86_64_v4\n  - py-anndata@3.14 arch=None-None-x86_64_v4\n  view")
 
+			mwr.SetRunning()
 			<-mwr.Ch
 			hash := fmt.Sprintf("%X", sha256.Sum256([]byte(ms3.Data)))
 			So(mwr.Cmd, ShouldContainSubstring, "echo doing build with hash "+hash+"; sudo singularity build")
@@ -346,6 +347,7 @@ packages:
 			err := builder.Build(def)
 			So(err, ShouldBeNil)
 
+			mwr.SetRunning()
 			<-mwr.Ch
 
 			ok := waitFor(func() bool {
@@ -406,6 +408,8 @@ packages:
 
 			err := builder.Build(def)
 			So(err, ShouldBeNil)
+
+			mwr.SetRunning()
 
 			ok := waitFor(func() bool {
 				return logWriter.String() != ""

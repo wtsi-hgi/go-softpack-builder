@@ -183,7 +183,8 @@ func TestServerMock(t *testing.T) {
 func TestServerReal(t *testing.T) {
 	Convey("With a real builder", t, func() {
 		ms3 := &internal.MockS3{}
-		mwr := &internal.MockWR{Ch: make(chan struct{})}
+		mockStatusPollInterval := 1 * time.Millisecond
+		mwr := internal.NewMockWR(mockStatusPollInterval, 10*time.Millisecond)
 		mc := &core.MockCore{Files: make(map[string]string)}
 		msc := httptest.NewServer(mc)
 
@@ -205,23 +206,32 @@ func TestServerReal(t *testing.T) {
 
 		handler := New(builder)
 		server := httptest.NewServer(handler)
-		So(server, ShouldNotBeNil)
+		So(server != nil, ShouldBeTrue)
 
 		buildSubmitted := time.Now()
 		postToBuildEndpoint(server, "users/user/myenv", "0.8.1")
 
 		Convey("you get a real status", func() {
-			resp, err := server.Client().Get(server.URL + endpointEnvsStatus) //nolint:noctx
-			So(err, ShouldBeNil)
-			So(resp.StatusCode, ShouldEqual, http.StatusOK)
-			var statuses []build.Status
-			err = json.NewDecoder(resp.Body).Decode(&statuses)
-			So(err, ShouldBeNil)
+			statuses := getTestStatuses(server)
 			So(len(statuses), ShouldEqual, 1)
 			So(statuses[0].Name, ShouldEqual, "users/user/myenv-0.8.1")
 			So(statuses[0].Requested, ShouldHappenAfter, buildSubmitted)
-			So(statuses[0].BuildStart, ShouldHappenAfter, statuses[0].Requested)
-			// BuildDone: ,
+			So(statuses[0].BuildStart.IsZero(), ShouldBeTrue)
+			So(statuses[0].BuildDone.IsZero(), ShouldBeTrue)
+
+			runT := time.Now()
+			mwr.SetRunning()
+			<-time.After(2 * mockStatusPollInterval)
+			statuses = getTestStatuses(server)
+			So(len(statuses), ShouldEqual, 1)
+			So(statuses[0].Requested, ShouldHappenAfter, buildSubmitted)
+			buildStart := statuses[0].BuildStart
+			So(buildStart, ShouldHappenAfter, runT)
+			So(statuses[0].BuildDone.IsZero(), ShouldBeTrue)
+
+			<-time.After(mwr.JobDuration)
+			statuses = getTestStatuses(server)
+			So(statuses[0].BuildDone, ShouldHappenAfter, buildStart)
 		})
 	})
 }
@@ -241,4 +251,15 @@ func postToBuildEndpoint(server *httptest.Server, name, version string) {
 
 	So(err, ShouldBeNil)
 	So(resp.StatusCode, ShouldEqual, http.StatusOK)
+}
+
+func getTestStatuses(server *httptest.Server) []build.Status {
+	resp, err := server.Client().Get(server.URL + endpointEnvsStatus) //nolint:noctx
+	So(err, ShouldBeNil)
+	So(resp.StatusCode, ShouldEqual, http.StatusOK)
+	var statuses []build.Status
+	err = json.NewDecoder(resp.Body).Decode(&statuses)
+	So(err, ShouldBeNil)
+
+	return statuses
 }

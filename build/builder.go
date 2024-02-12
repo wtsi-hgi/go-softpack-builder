@@ -179,6 +179,7 @@ type S3 interface {
 
 type Runner interface {
 	Add(deployment string) (string, error)
+	WaitForRunning(id string) error
 	Wait(id string) (wr.WRJobStatus, error)
 	Status(id string) (wr.WRJobStatus, error)
 }
@@ -206,6 +207,8 @@ type Builder struct {
 
 	statusMu sync.RWMutex
 	statuses map[string]*Status
+
+	runnerPollInterval time.Duration
 }
 
 // New takes the s3 build cache URL, the repo and checkout reference of your
@@ -232,6 +235,7 @@ func New(config *config.Config, s3helper S3, runner Runner) (*Builder, error) {
 		runner:              runner,
 		runningEnvironments: make(map[string]bool),
 		statuses:            make(map[string]*Status),
+		runnerPollInterval:  1 * time.Second,
 	}, nil
 }
 
@@ -397,14 +401,26 @@ func (b *Builder) startBuild(def *Definition, wrInput, s3Path, singDef, singDefP
 
 func (b *Builder) asyncBuild(def *Definition, wrInput, s3Path, singDef string) error {
 	status := b.buildStatus(def)
-	status.BuildStart = time.Now()
 
 	jobID, err := b.runner.Add(wrInput)
 	if err != nil {
 		return err
 	}
 
+	err = b.runner.WaitForRunning(jobID)
+	if err != nil {
+		return err
+	}
+
+	b.statusMu.Lock()
+	status.BuildStart = time.Now()
+	b.statusMu.Unlock()
+
 	_, err = b.runner.Wait(jobID)
+
+	b.statusMu.Lock()
+	status.BuildDone = time.Now()
+	b.statusMu.Unlock()
 
 	b.postBuildMu.RLock()
 	if b.postBuild != nil {
