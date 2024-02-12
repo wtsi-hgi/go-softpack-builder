@@ -141,23 +141,61 @@ func (r *Runner) runWRCmd(cmd *exec.Cmd) (string, error) {
 	return strings.TrimSpace(std.String()), nil
 }
 
-// Wait waits for the given wr job to exit.
-func (r *Runner) Wait(id string) (WRJobStatus, error) {
+// WaitForRunning waits until the given wr job either starts running, or exits.
+func (r *Runner) WaitForRunning(id string) error {
+	var err error
+
+	cb := func(status WRJobStatus, cbErr error) bool {
+		err = cbErr
+
+		return err != nil || statusIsStarted(status) || statusIsExited(status)
+	}
+
+	r.pollStatus(id, cb)
+
+	return err
+}
+
+func statusIsStarted(status WRJobStatus) bool {
+	return status == WRJobStatusRunning || status == WRJobStatusLost
+}
+
+func statusIsExited(status WRJobStatus) bool {
+	return status == WRJobStatusInvalid || status == WRJobStatusBuried || status == WRJobStatusComplete
+}
+
+// pollStatusCallback receives a WRJobStatus and error, and should return true
+// if you want to stop polling now.
+type pollStatusCallback = func(WRJobStatus, error) bool
+
+func (r *Runner) pollStatus(id string, cb pollStatusCallback) {
 	ticker := time.NewTicker(r.pollDuration)
 	defer ticker.Stop()
 
 	for range ticker.C {
-		status, err := r.Status(id)
-		if err != nil {
-			return status, err
-		}
-
-		if status == WRJobStatusInvalid || status == WRJobStatusBuried || status == WRJobStatusComplete {
-			return status, err
+		if cb(r.Status(id)) {
+			return
 		}
 	}
+}
 
-	return WRJobStatusInvalid, nil
+// Wait waits for the given wr job to exit.
+func (r *Runner) Wait(id string) (WRJobStatus, error) {
+	var (
+		status WRJobStatus
+		err    error
+	)
+
+	cb := func(cbStatus WRJobStatus, cbErr error) bool {
+		status = cbStatus
+		err = cbErr
+
+		return err != nil || statusIsExited(status)
+	}
+
+	r.pollStatus(id, cb)
+
+	return status, err
 }
 
 // Status returns the status of the wr job with the given internal ID.
@@ -193,7 +231,7 @@ func (r *Runner) Status(id string) (WRJobStatus, error) {
 	return status, scanner.Err()
 }
 
-func statusStringToType(status string) WRJobStatus {
+func statusStringToType(status string) WRJobStatus { //nolint:gocyclo
 	switch status {
 	case "delayed":
 		return WRJobStatusDelayed
