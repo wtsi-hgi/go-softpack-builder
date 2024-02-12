@@ -26,6 +26,7 @@ package core
 import (
 	"errors"
 	"io"
+	"mime/multipart"
 	"net/http"
 	"net/url"
 	"path/filepath"
@@ -82,6 +83,10 @@ func (m *MockCore) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	m.readFileFromQuery(mr, envPath)
+}
+
+func (m *MockCore) readFileFromQuery(mr *multipart.Reader, envPath string) {
 	for {
 		p, err := mr.NextPart()
 		if errors.Is(err, io.EOF) {

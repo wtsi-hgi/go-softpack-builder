@@ -219,7 +219,7 @@ Stage: final
 
 			So(bcbCount.Load(), ShouldEqual, 0)
 
-			So(ms3.Def, ShouldEqual, "groups/hgi/xxhash/0.8.1/singularity.def")
+			So(ms3.Def, ShouldEqual, filepath.Join(def.getS3Path(), "singularity.def"))
 			So(ms3.Data, ShouldContainSubstring, "specs:\n  - xxhash@0.8.1 arch=None-None-x86_64_v4\n"+
 				"  - r-seurat@4 arch=None-None-x86_64_v4\n  - py-anndata@3.14 arch=None-None-x86_64_v4\n  view")
 
@@ -310,7 +310,7 @@ packages:
   - r-seurat@4
 `
 
-			expectedReadmeContent := "module load " + moduleLoadPrefix + "/groups/hgi/xxhash/0.8.1"
+			expectedReadmeContent := "module load " + filepath.Join(moduleLoadPrefix, def.getS3Path())
 
 			for file, expectedData := range map[string]string{
 				core.SoftpackYaml:           expectedSoftpackYaml,
@@ -320,12 +320,12 @@ packages:
 				core.BuilderOut:             "output",
 				core.UsageBasename:          expectedReadmeContent,
 			} {
-				data, okg := mc.GetFile("groups/hgi/xxhash-0.8.1/" + file)
+				data, okg := mc.GetFile(filepath.Join(def.getRepoPath(), file))
 				So(okg, ShouldBeTrue)
 				So(data, ShouldContainSubstring, expectedData)
 			}
 
-			_, ok = mc.GetFile("groups/hgi/xxhash-0.8.1/" + core.ImageBasename)
+			_, ok = mc.GetFile(filepath.Join(def.getRepoPath(), core.ImageBasename))
 			So(ok, ShouldBeFalse)
 
 			So(ms3.SoftpackYML, ShouldEqual, expectedSoftpackYaml)
@@ -356,9 +356,9 @@ packages:
 			So(ok, ShouldBeTrue)
 
 			So(logWriter.String(), ShouldContainSubstring,
-				"msg=\"Async part of build failed\" err=\"Mock error\" s3Path=some_path/groups/hgi/xxhash/0.8.1")
+				"msg=\"Async part of build failed\" err=\"Mock error\" s3Path=some_path/"+def.getS3Path())
 
-			data, ok := mc.GetFile("groups/hgi/xxhash-0.8.1/" + core.BuilderOut)
+			data, ok := mc.GetFile(filepath.Join(def.getRepoPath(), core.BuilderOut))
 			So(ok, ShouldBeTrue)
 			So(data, ShouldContainSubstring, "output")
 
@@ -466,6 +466,14 @@ func getExampleDefinition() *Definition {
 			},
 		},
 	}
+}
+
+func (d *Definition) getS3Path() string {
+	return filepath.Join(d.EnvironmentPath, d.EnvironmentName, d.EnvironmentVersion)
+}
+
+func (d *Definition) getRepoPath() string {
+	return filepath.Join(d.EnvironmentPath, d.EnvironmentName) + "-" + d.EnvironmentVersion
 }
 
 func waitFor(toRun func() bool) bool {

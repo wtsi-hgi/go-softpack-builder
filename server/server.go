@@ -72,7 +72,7 @@ func New(b Builder) http.Handler {
 		case endpointEnvsBuild:
 			handleEnvBuild(b, w, r)
 		case endpointEnvsStatus:
-			handleEnvStatus(b, w, r)
+			handleEnvStatus(b, w)
 		default:
 			http.Error(w, "Not found", http.StatusNotFound)
 		}
@@ -103,6 +103,9 @@ func handleEnvBuild(b Builder, w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func handleEnvStatus(b Builder, w http.ResponseWriter, r *http.Request) {
-	json.NewEncoder(w).Encode(b.Status())
+func handleEnvStatus(b Builder, w http.ResponseWriter) {
+	err := json.NewEncoder(w).Encode(b.Status())
+	if err != nil {
+		http.Error(w, fmt.Sprintf("error serialising status: %s", err), http.StatusInternalServerError)
+	}
 }

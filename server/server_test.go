@@ -257,7 +257,9 @@ func getTestStatuses(server *httptest.Server) []build.Status {
 	resp, err := server.Client().Get(server.URL + endpointEnvsStatus) //nolint:noctx
 	So(err, ShouldBeNil)
 	So(resp.StatusCode, ShouldEqual, http.StatusOK)
+
 	var statuses []build.Status
+
 	err = json.NewDecoder(resp.Body).Decode(&statuses)
 	So(err, ShouldBeNil)
 
