@@ -27,6 +27,7 @@ import (
 	"bufio"
 	"bytes"
 	_ "embed"
+	"log/slog"
 	"os/exec"
 	"strings"
 	"text/template"
@@ -209,12 +210,16 @@ func (r *Runner) Status(id string) (WRJobStatus, error) {
 
 	out, err := r.runWRCmd(cmd)
 	if err != nil {
+		slog.Error("wr status command failed", "err", err)
+
 		return WRJobStatusInvalid, err
 	}
 
-	status := WRJobStatusInvalid
+	return parseWRStatus(out, id)
+}
 
-	scanner := bufio.NewScanner(strings.NewReader(out))
+func parseWRStatus(wrStatusOutput, id string) (WRJobStatus, error) {
+	scanner := bufio.NewScanner(strings.NewReader(wrStatusOutput))
 	for scanner.Scan() {
 		cols := strings.Split(scanner.Text(), "\t")
 		if len(cols) != plainStatusCols {
@@ -225,10 +230,12 @@ func (r *Runner) Status(id string) (WRJobStatus, error) {
 			continue
 		}
 
-		status = statusStringToType(cols[1])
+		return statusStringToType(cols[1]), nil
 	}
 
-	return status, scanner.Err()
+	slog.Error("wr status parsing to find a job failed", "id", id, "err", scanner.Err())
+
+	return WRJobStatusInvalid, scanner.Err()
 }
 
 func statusStringToType(status string) WRJobStatus { //nolint:gocyclo
