@@ -1,8 +1,8 @@
 # go-softpack-builder (gsb)
 Go implementation of a softpack builder service.
 
-After receiving a POST (see Testing section below) with desired environment
-details, this service does the following:
+After receiving a POST to `/environments/build` (see Testing section below) with
+desired environment details, this service does the following:
 
 1. A singularity definition file, singularity.def, is created and uploaded to
    an environment-specific subdirectory of your S3 build location.
@@ -42,6 +42,23 @@ details, this service does the following:
    Note that the image is not sent to core, so the repo doesn't get too large.
    It can be reproduced exactly at any time using the singularity.def, assuming
    you configure specific images (ie. not :latest) to use.
+
+After receiving a GET to `/environments/status`, this service returns a JSON
+response with the following structure:
+
+```json
+[
+  {
+    "Name": "users/foo/bar",
+    "Requested": "2024-02-12T11:58:49.808672303Z",
+    "BuildStart": "2024-02-12T11:58:55.430080969Z",
+    "BuildDone": "2024-02-12T11:59:00.532174828Z"
+  }
+]
+```
+
+The times are quoted strings in the RFC 3339 format with sub-second precision,
+or null.
 
 ## Initial setup
 

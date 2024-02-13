@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2023 Genome Research Ltd.
+ * Copyright (c) 2023, 2024 Genome Research Ltd.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -69,16 +69,20 @@ func TestWR(t *testing.T) {
 		return
 	}
 
-	Convey("You can run a WR command", t, func() {
+	runner := New("development")
+	runner.memory = "100M"
+	runner.pollDuration = 10 * time.Millisecond
+
+	Convey("You can run a cmd via wr", t, func() {
 		now := time.Now()
-
-		runner := New("development")
-
-		runner.memory = "100M"
-
-		runArgs, repGrp := uniqueRunArgs("sleep 2s")
-		err := runner.Run(runArgs)
+		runArgs, repGrp := uniqueRunArgs("sleep 2s", "")
+		jobID, err := runner.Add(runArgs)
 		So(err, ShouldBeNil)
+		err = runner.WaitForRunning(jobID)
+		So(err, ShouldBeNil)
+		status, err := runner.Wait(jobID)
+		So(err, ShouldBeNil)
+		So(status, ShouldEqual, WRJobStatusComplete)
 		So(time.Since(now), ShouldBeGreaterThan, 2*time.Second)
 
 		cmd := exec.Command("wr", "status", "--deployment", runner.deployment, "-i", repGrp, "-o", "json") //nolint:gosec
@@ -92,17 +96,61 @@ func TestWR(t *testing.T) {
 		So(stderr.String(), ShouldBeBlank)
 		So(stdout.String(), ShouldContainSubstring, `"State":"complete"`)
 
-		err = runner.Run(runArgs)
+		jobID2, err := runner.Add(runArgs)
+		So(err, ShouldBeNil)
+		So(jobID2, ShouldEqual, jobID)
+		err = runner.WaitForRunning(jobID)
+		So(err, ShouldBeNil)
+		status, err = runner.Wait(jobID)
+		So(err, ShouldBeNil)
+		So(status, ShouldEqual, WRJobStatusComplete)
+
+		runArgs, _ = uniqueRunArgs("false", "")
+		jobID, err = runner.Add(runArgs)
+		So(err, ShouldBeNil)
+		err = runner.WaitForRunning(jobID)
+		So(err, ShouldBeNil)
+		status, err = runner.Wait(jobID)
+		So(err, ShouldBeNil)
+		So(status, ShouldEqual, WRJobStatusBuried)
+	})
+
+	Convey("WaitForRunning returns when the build starts running", t, func() {
+		cmd := exec.Command("wr", "limit", "--deployment", runner.deployment, "-g", "limited:0") //nolint:gosec
+		err := cmd.Run()
 		So(err, ShouldBeNil)
 
-		runArgs, _ = uniqueRunArgs("false")
-		err = runner.Run(runArgs)
-		So(err, ShouldNotBeNil)
-		So(err.Error(), ShouldEqual, "wr add failed: exit status 1")
+		runArgs, _ := uniqueRunArgs("sleep 2s", "limited")
+		jobID, err := runner.Add(runArgs)
+		So(err, ShouldBeNil)
+
+		runningCh := make(chan time.Time)
+		errCh := make(chan error, 1)
+		go func() {
+			errCh <- runner.WaitForRunning(jobID)
+			runningCh <- time.Now()
+		}()
+
+		<-time.After(100 * time.Millisecond)
+
+		startTime := time.Now()
+		cmd = exec.Command("wr", "limit", "--deployment", runner.deployment, "-g", "limited:1") //nolint:gosec
+		err = cmd.Run()
+		So(err, ShouldBeNil)
+
+		status, err := runner.Wait(jobID)
+		So(err, ShouldBeNil)
+		endTime := time.Now()
+		So(status, ShouldEqual, WRJobStatusComplete)
+
+		So(<-errCh, ShouldBeNil)
+		runningTime := <-runningCh
+		So(runningTime, ShouldHappenAfter, startTime)
+		So(runningTime, ShouldHappenBefore, endTime.Add(-1*time.Second))
 	})
 }
 
-func uniqueRunArgs(cmd string) (string, string) {
+func uniqueRunArgs(cmd, limitGrp string) (string, string) {
 	b := make([]byte, 16)
 	n, err := rand.Read(b)
 	So(n, ShouldEqual, 16)
@@ -110,5 +158,6 @@ func uniqueRunArgs(cmd string) (string, string) {
 
 	repGrp := fmt.Sprintf("%x", b)
 
-	return `{"cmd":"` + cmd + ` && echo ` + repGrp + `", "rep_grp": "` + repGrp + `", "retries": 0}`, repGrp
+	return `{"cmd":"` + cmd + ` && echo ` + repGrp + `", "rep_grp": "` + repGrp +
+		`", "limit_grps": ["` + limitGrp + `"], "retries": 0}`, repGrp
 }

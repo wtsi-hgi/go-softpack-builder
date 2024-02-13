@@ -31,6 +31,7 @@ import (
 	"testing"
 
 	. "github.com/smartystreets/goconvey/convey"
+	"github.com/wtsi-hgi/go-softpack-builder/internal/core"
 )
 
 func TestInstall(t *testing.T) {
@@ -55,7 +56,7 @@ func TestInstall(t *testing.T) {
 			def.EnvironmentName, def.EnvironmentVersion))
 		scriptsDir := filepath.Join(tmpScriptsDir, def.EnvironmentPath, def.EnvironmentName,
 			def.EnvironmentVersion+ScriptsDirSuffix)
-		createdImageFile := readFile(t, filepath.Join(scriptsDir, ImageBasename))
+		createdImageFile := readFile(t, filepath.Join(scriptsDir, core.ImageBasename))
 
 		So(createdModuleFile, ShouldEqual, moduleFile)
 		So(createdImageFile, ShouldEqual, imageFile)

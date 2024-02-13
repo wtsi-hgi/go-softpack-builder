@@ -15,17 +15,18 @@ import (
 
 	"github.com/wtsi-hgi/go-softpack-builder/build"
 	"github.com/wtsi-hgi/go-softpack-builder/config"
+	"github.com/wtsi-hgi/go-softpack-builder/internal/core"
 	"golang.org/x/sys/unix"
 )
 
 var s3BasenamesForDeletion = [...]string{ //nolint:gochecknoglobals
-	build.SingularityDefBasename,
-	build.ExesBasename,
-	build.SoftpackYaml,
-	build.SpackLockFile,
-	build.BuilderOut,
-	build.UsageBasename,
-	build.ImageBasename,
+	core.SingularityDefBasename,
+	core.ExesBasename,
+	core.SoftpackYaml,
+	core.SpackLockFile,
+	core.BuilderOut,
+	core.UsageBasename,
+	core.ImageBasename,
 }
 
 type Error string

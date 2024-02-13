@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2023 Genome Research Ltd.
+ * Copyright (c) 2023, 2024 Genome Research Ltd.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -24,18 +24,39 @@
 package wr
 
 import (
+	"bufio"
 	"bytes"
 	_ "embed"
+	"log/slog"
 	"os/exec"
 	"strings"
 	"text/template"
+	"time"
+)
+
+type WRJobStatus int
+
+const (
+	WRJobStatusInvalid WRJobStatus = iota
+	WRJobStatusDelayed
+	WRJobStatusReady
+	WRJobStatusReserved
+	WRJobStatusRunning
+	WRJobStatusLost
+	WRJobStatusBuried
+	WRJobStatusComplete
+)
+
+const (
+	plainStatusCols     = 2
+	defaultPollDuration = 5 * time.Second
 )
 
 type Error struct {
 	msg string
 }
 
-func (e Error) Error() string { return "wr add failed: " + e.msg }
+func (e Error) Error() string { return "wr cmd failed: " + e.msg }
 
 //go:embed wr.tmpl
 var wrTmplStr string
@@ -65,42 +86,175 @@ func SingularityBuildInS3WRInput(s3Path, hash string) (string, error) {
 
 // Runner lets you Run() a wr add command.
 type Runner struct {
-	deployment string
-	memory     string
+	deployment   string
+	memory       string
+	pollDuration time.Duration
 }
 
 // New returns a Runner that will use the given wr deployment to wr add jobs
 // during Run().
 func New(deployment string) *Runner {
-	return &Runner{deployment: deployment, memory: "43G"}
+	return &Runner{
+		deployment:   deployment,
+		memory:       "43G",
+		pollDuration: defaultPollDuration,
+	}
 }
 
 // Run pipes the given wrInput (eg. as produced by
-// SingularityBuildInS3WRInput()) to `wr add` and waits for the job to exit. The
-// memory defaults to 8GB, time to 8hrs, and if the cmd in the input has
+// SingularityBuildInS3WRInput()) to `wr add`, which adds a job to wr's queue
+// and returns its ID. You should call Wait(ID) to actually wait for the job to
+// finishing running.
+//
+// The memory defaults to 8GB, time to 8hrs, and if the cmd in the input has
 // previously been run, the cmd will be re-run.
 //
 // NB: if the cmd is a duplicate of a currently queued job, this will not
-// generate an error, but just wait until that job completes.
-func (r *Runner) Run(wrInput string) error {
-	cmd := exec.Command("wr", "add", "--deployment", r.deployment, "--sync", //nolint:gosec
+// generate an error, but just return the id of the existing job.
+func (r *Runner) Add(wrInput string) (string, error) {
+	cmd := exec.Command("wr", "add", "--deployment", r.deployment, "--simple", //nolint:gosec
 		"--time", "8h", "--memory", r.memory, "-o", "2", "--rerun")
 	cmd.Stdin = strings.NewReader(wrInput)
 
-	var std bytes.Buffer
+	return r.runWRCmd(cmd)
+}
 
-	cmd.Stdout = &std
-	cmd.Stderr = &std
+func (r *Runner) runWRCmd(cmd *exec.Cmd) (string, error) {
+	var stdout, stderr bytes.Buffer
+
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
 
 	err := cmd.Run()
 	if err != nil {
-		errStr := std.String()
+		errStr := stderr.String()
+		if !strings.Contains(errStr, "EROR") {
+			return strings.TrimSpace(stdout.String()), nil
+		}
+
 		if errStr == "" {
 			errStr = err.Error()
 		}
 
-		return Error{msg: errStr}
+		return "", Error{msg: errStr}
 	}
 
-	return nil
+	return strings.TrimSpace(stdout.String()), nil
+}
+
+// WaitForRunning waits until the given wr job either starts running, or exits.
+func (r *Runner) WaitForRunning(id string) error {
+	var err error
+
+	cb := func(status WRJobStatus, cbErr error) bool {
+		err = cbErr
+
+		return err != nil || statusIsStarted(status) || statusIsExited(status)
+	}
+
+	r.pollStatus(id, cb)
+
+	return err
+}
+
+func statusIsStarted(status WRJobStatus) bool {
+	return status == WRJobStatusRunning || status == WRJobStatusLost
+}
+
+func statusIsExited(status WRJobStatus) bool {
+	return status == WRJobStatusInvalid || status == WRJobStatusBuried || status == WRJobStatusComplete
+}
+
+// pollStatusCallback receives a WRJobStatus and error, and should return true
+// if you want to stop polling now.
+type pollStatusCallback = func(WRJobStatus, error) bool
+
+func (r *Runner) pollStatus(id string, cb pollStatusCallback) {
+	ticker := time.NewTicker(r.pollDuration)
+	defer ticker.Stop()
+
+	for range ticker.C {
+		if cb(r.Status(id)) {
+			return
+		}
+	}
+}
+
+// Wait waits for the given wr job to exit.
+func (r *Runner) Wait(id string) (WRJobStatus, error) {
+	var (
+		status WRJobStatus
+		err    error
+	)
+
+	cb := func(cbStatus WRJobStatus, cbErr error) bool {
+		status = cbStatus
+		err = cbErr
+
+		return err != nil || statusIsExited(status)
+	}
+
+	r.pollStatus(id, cb)
+
+	return status, err
+}
+
+// Status returns the status of the wr job with the given internal ID.
+//
+// Returns WRJobStatusInvalid if the ID wasn't found. Returns WRJobStatusBuried
+// if it failed. Only returns an error if there was a problem getting the
+// status.
+func (r *Runner) Status(id string) (WRJobStatus, error) {
+	cmd := exec.Command("wr", "status", "--deployment", r.deployment, "-o", //nolint:gosec
+		"plain", "-i", id, "-y")
+
+	out, err := r.runWRCmd(cmd)
+	if err != nil {
+		slog.Error("wr status command failed", "err", err)
+
+		return WRJobStatusInvalid, err
+	}
+
+	return parseWRStatus(out, id)
+}
+
+func parseWRStatus(wrStatusOutput, id string) (WRJobStatus, error) {
+	scanner := bufio.NewScanner(strings.NewReader(wrStatusOutput))
+	for scanner.Scan() {
+		cols := strings.Split(scanner.Text(), "\t")
+		if len(cols) != plainStatusCols {
+			continue
+		}
+
+		if cols[0] != id {
+			continue
+		}
+
+		return statusStringToType(cols[1]), nil
+	}
+
+	slog.Error("wr status parsing to find a job failed", "id", id, "err", scanner.Err())
+
+	return WRJobStatusInvalid, scanner.Err()
+}
+
+func statusStringToType(status string) WRJobStatus { //nolint:gocyclo
+	switch status {
+	case "delayed":
+		return WRJobStatusDelayed
+	case "ready":
+		return WRJobStatusReady
+	case "reserved":
+		return WRJobStatusReserved
+	case "running":
+		return WRJobStatusRunning
+	case "lost":
+		return WRJobStatusLost
+	case "buried":
+		return WRJobStatusBuried
+	case "complete":
+		return WRJobStatusComplete
+	default:
+		return WRJobStatusInvalid
+	}
 }
