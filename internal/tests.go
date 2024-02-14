@@ -165,6 +165,13 @@ func (m *MockWR) SetRunning() {
 	m.ReturnStatus = wr.WRJobStatusRunning
 }
 
+func (m *MockWR) SetComplete() {
+	m.Lock()
+	defer m.Unlock()
+
+	m.ReturnStatus = wr.WRJobStatusComplete
+}
+
 // WaitForRunning implements build.Runner interface.
 func (m *MockWR) WaitForRunning(string) error { //nolint:unparam
 	for {

@@ -49,18 +49,18 @@ const moduleLoadPrefix = "HGI/softpack"
 type modifyRunner struct {
 	cmd string
 	*wr.Runner
-	ch chan bool
+	LastJobID string
 }
 
 func (m *modifyRunner) Add(_ string) (string, error) {
 	jobID, err := m.Runner.Add(m.cmd)
+	m.LastJobID = jobID
 
 	return jobID, err
 }
 
 func (m *modifyRunner) Wait(id string) (wr.WRJobStatus, error) {
 	status, err := m.Runner.Wait(id)
-	m.ch <- true
 
 	return status, err
 }
@@ -205,7 +205,7 @@ Stage: final
 		})
 
 		var logWriter internal.ConcurrentStringBuilder
-		slog.SetDefault(slog.New(slog.NewTextHandler(&logWriter, nil)))
+		slog.SetDefault(slog.New(slog.NewTextHandler(&logWriter, &slog.HandlerOptions{Level: slog.LevelInfo})))
 
 		Convey("You can do a Build", func() {
 			conf.Module.ModuleInstallDir = t.TempDir()
@@ -379,23 +379,24 @@ packages:
 			conf.Module.LoadPath = moduleLoadPrefix
 			ms3.Exes = "xxhsum\nxxh32sum\nxxh64sum\nxxh128sum\n"
 
-			ch := make(chan bool, 1)
 			mr := &modifyRunner{
 				cmd:    "sleep 2s",
 				Runner: wr.New("development"),
-				ch:     ch,
 			}
 
 			builder.runner = mr
 
 			err = builder.Build(def)
+			jobID1 := mr.LastJobID
 			So(err, ShouldBeNil)
 
 			err = builder.Build(def)
+			jobID2 := mr.LastJobID
 			So(err, ShouldNotBeNil)
 			So(err, ShouldEqual, ErrEnvironmentBuilding)
 
-			<-ch
+			mr.Wait(jobID1)
+			mr.Wait(jobID2)
 		})
 
 		Convey("When the Core doesn't respond we get a meaningful error", func() {
@@ -409,7 +410,7 @@ packages:
 			err := builder.Build(def)
 			So(err, ShouldBeNil)
 
-			mwr.SetRunning()
+			mwr.SetComplete()
 
 			ok := waitFor(func() bool {
 				return logWriter.String() != ""
