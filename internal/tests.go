@@ -131,7 +131,6 @@ func (m *MockS3) OpenFile(source string) (io.ReadCloser, error) {
 
 // MockWR can be used to test a build.Builder without having real wr running.
 type MockWR struct {
-	Ch                    chan struct{}
 	Cmd                   string
 	Fail                  bool
 	PollForStatusInterval time.Duration
@@ -143,7 +142,6 @@ type MockWR struct {
 
 func NewMockWR(pollForStatusInterval, jobDuration time.Duration) *MockWR {
 	return &MockWR{
-		Ch:                    make(chan struct{}),
 		PollForStatusInterval: pollForStatusInterval,
 		JobDuration:           jobDuration,
 	}
@@ -189,11 +187,10 @@ func (m *MockWR) WaitForRunning(string) error { //nolint:unparam
 
 // Wait implements build.Runner interface.
 func (m *MockWR) Wait(string) (wr.WRJobStatus, error) {
-	defer close(m.Ch)
 	<-time.After(m.JobDuration)
 
 	if m.Fail {
-		return wr.WRJobStatusBuried, ErrMock
+		return wr.WRJobStatusBuried, nil
 	}
 
 	return wr.WRJobStatusComplete, nil

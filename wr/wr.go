@@ -126,7 +126,8 @@ func (r *Runner) runWRCmd(cmd *exec.Cmd) (string, error) {
 	cmd.Stderr = &stderr
 
 	err := cmd.Run()
-	slog.Debug("ran wr command", "cmd", cmd.String(), "stdout", stdout.String(), "stderr", stderr.String(), "err", err, "exitcode", cmd.ProcessState.ExitCode())
+	slog.Debug("ran wr command", "cmd", cmd.String(), "stdout", stdout.String(),
+		"stderr", stderr.String(), "err", err, "exitcode", cmd.ProcessState.ExitCode())
 
 	if err != nil {
 		errStr := stderr.String()

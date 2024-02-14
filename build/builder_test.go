@@ -224,7 +224,8 @@ Stage: final
 				"  - r-seurat@4 arch=None-None-x86_64_v4\n  - py-anndata@3.14 arch=None-None-x86_64_v4\n  view")
 
 			mwr.SetRunning()
-			<-mwr.Ch
+			_, err = mwr.Wait("")
+			So(err, ShouldBeNil)
 			hash := fmt.Sprintf("%X", sha256.Sum256([]byte(ms3.Data)))
 			So(mwr.Cmd, ShouldContainSubstring, "echo doing build with hash "+hash+"; sudo singularity build")
 
@@ -347,8 +348,9 @@ packages:
 			err := builder.Build(def)
 			So(err, ShouldBeNil)
 
-			mwr.SetRunning()
-			<-mwr.Ch
+			mwr.SetComplete()
+			_, err = mwr.Wait("")
+			So(err, ShouldBeNil)
 
 			ok := waitFor(func() bool {
 				return logWriter.String() != ""
@@ -356,7 +358,7 @@ packages:
 			So(ok, ShouldBeTrue)
 
 			So(logWriter.String(), ShouldContainSubstring,
-				"msg=\"Async part of build failed\" err=\"Mock error\" s3Path=some_path/"+def.getS3Path())
+				"msg=\"Async part of build failed\" err=\""+ErrBuildFailed+"\" s3Path=some_path/"+def.getS3Path())
 
 			data, ok := mc.GetFile(filepath.Join(def.getRepoPath(), core.BuilderOut))
 			So(ok, ShouldBeTrue)
@@ -395,8 +397,10 @@ packages:
 			So(err, ShouldNotBeNil)
 			So(err, ShouldEqual, ErrEnvironmentBuilding)
 
-			mr.Wait(jobID1)
-			mr.Wait(jobID2)
+			_, err = mr.Wait(jobID1)
+			So(err, ShouldBeNil)
+			_, err = mr.Wait(jobID2)
+			So(err, ShouldBeNil)
 		})
 
 		Convey("When the Core doesn't respond we get a meaningful error", func() {
@@ -425,7 +429,6 @@ packages:
 			mc.Err = internal.Error("an error")
 
 			logWriter.Reset()
-			mwr.Ch = make(chan struct{})
 			conf.Module.ModuleInstallDir = t.TempDir()
 			conf.Module.ScriptsInstallDir = t.TempDir()
 
