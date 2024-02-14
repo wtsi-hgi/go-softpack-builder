@@ -74,7 +74,7 @@ func New(b Builder) http.Handler {
 		case endpointEnvsStatus:
 			handleEnvStatus(b, w)
 		default:
-			http.Error(w, "Not found", http.StatusNotFound)
+			http.Error(w, fmt.Sprintf("go-softpack-builder: no such endpoint: %s", r.URL.Path), http.StatusNotFound)
 		}
 	})
 }

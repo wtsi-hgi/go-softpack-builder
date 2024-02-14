@@ -49,18 +49,18 @@ const moduleLoadPrefix = "HGI/softpack"
 type modifyRunner struct {
 	cmd string
 	*wr.Runner
-	ch chan bool
+	LastJobID string
 }
 
 func (m *modifyRunner) Add(_ string) (string, error) {
 	jobID, err := m.Runner.Add(m.cmd)
+	m.LastJobID = jobID
 
 	return jobID, err
 }
 
 func (m *modifyRunner) Wait(id string) (wr.WRJobStatus, error) {
 	status, err := m.Runner.Wait(id)
-	m.ch <- true
 
 	return status, err
 }
@@ -205,7 +205,7 @@ Stage: final
 		})
 
 		var logWriter internal.ConcurrentStringBuilder
-		slog.SetDefault(slog.New(slog.NewTextHandler(&logWriter, nil)))
+		slog.SetDefault(slog.New(slog.NewTextHandler(&logWriter, &slog.HandlerOptions{Level: slog.LevelInfo})))
 
 		Convey("You can do a Build", func() {
 			conf.Module.ModuleInstallDir = t.TempDir()
@@ -224,7 +224,8 @@ Stage: final
 				"  - r-seurat@4 arch=None-None-x86_64_v4\n  - py-anndata@3.14 arch=None-None-x86_64_v4\n  view")
 
 			mwr.SetRunning()
-			<-mwr.Ch
+			_, err = mwr.Wait("")
+			So(err, ShouldBeNil)
 			hash := fmt.Sprintf("%X", sha256.Sum256([]byte(ms3.Data)))
 			So(mwr.Cmd, ShouldContainSubstring, "echo doing build with hash "+hash+"; sudo singularity build")
 
@@ -347,8 +348,9 @@ packages:
 			err := builder.Build(def)
 			So(err, ShouldBeNil)
 
-			mwr.SetRunning()
-			<-mwr.Ch
+			mwr.SetComplete()
+			_, err = mwr.Wait("")
+			So(err, ShouldBeNil)
 
 			ok := waitFor(func() bool {
 				return logWriter.String() != ""
@@ -356,7 +358,7 @@ packages:
 			So(ok, ShouldBeTrue)
 
 			So(logWriter.String(), ShouldContainSubstring,
-				"msg=\"Async part of build failed\" err=\"Mock error\" s3Path=some_path/"+def.getS3Path())
+				"msg=\"Async part of build failed\" err=\""+ErrBuildFailed+"\" s3Path=some_path/"+def.getS3Path())
 
 			data, ok := mc.GetFile(filepath.Join(def.getRepoPath(), core.BuilderOut))
 			So(ok, ShouldBeTrue)
@@ -379,23 +381,26 @@ packages:
 			conf.Module.LoadPath = moduleLoadPrefix
 			ms3.Exes = "xxhsum\nxxh32sum\nxxh64sum\nxxh128sum\n"
 
-			ch := make(chan bool, 1)
 			mr := &modifyRunner{
 				cmd:    "sleep 2s",
 				Runner: wr.New("development"),
-				ch:     ch,
 			}
 
 			builder.runner = mr
 
 			err = builder.Build(def)
+			jobID1 := mr.LastJobID
 			So(err, ShouldBeNil)
 
 			err = builder.Build(def)
+			jobID2 := mr.LastJobID
 			So(err, ShouldNotBeNil)
 			So(err, ShouldEqual, ErrEnvironmentBuilding)
 
-			<-ch
+			_, err = mr.Wait(jobID1)
+			So(err, ShouldBeNil)
+			_, err = mr.Wait(jobID2)
+			So(err, ShouldBeNil)
 		})
 
 		Convey("When the Core doesn't respond we get a meaningful error", func() {
@@ -409,7 +414,7 @@ packages:
 			err := builder.Build(def)
 			So(err, ShouldBeNil)
 
-			mwr.SetRunning()
+			mwr.SetComplete()
 
 			ok := waitFor(func() bool {
 				return logWriter.String() != ""
@@ -424,7 +429,6 @@ packages:
 			mc.Err = internal.Error("an error")
 
 			logWriter.Reset()
-			mwr.Ch = make(chan struct{})
 			conf.Module.ModuleInstallDir = t.TempDir()
 			conf.Module.ScriptsInstallDir = t.TempDir()
 

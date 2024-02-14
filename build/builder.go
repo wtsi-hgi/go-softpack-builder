@@ -51,6 +51,7 @@ import (
 
 const (
 	uploadEndpoint = "/upload"
+	ErrBuildFailed = "environment build failed"
 )
 
 //go:embed singularity.tmpl
@@ -418,7 +419,7 @@ func (b *Builder) asyncBuild(def *Definition, wrInput, s3Path, singDef string) e
 	status.BuildStart = &buildStart
 	b.statusMu.Unlock()
 
-	_, err = b.runner.Wait(jobID)
+	wrStatus, err := b.runner.Wait(jobID)
 
 	b.statusMu.Lock()
 	buildDone := time.Now()
@@ -433,8 +434,12 @@ func (b *Builder) asyncBuild(def *Definition, wrInput, s3Path, singDef string) e
 	}
 	b.postBuildMu.RUnlock()
 
-	if err != nil {
+	if err != nil || wrStatus != wr.WRJobStatusComplete {
 		b.addLogToRepo(s3Path, def.FullEnvironmentPath())
+
+		if err == nil {
+			err = internal.Error(ErrBuildFailed)
+		}
 
 		return err
 	}
