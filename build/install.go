@@ -28,7 +28,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/wtsi-hgi/go-softpack-builder/internal/core"
+	"github.com/wtsi-hgi/go-softpack-builder/core"
 )
 
 const (

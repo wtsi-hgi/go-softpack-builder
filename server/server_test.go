@@ -36,9 +36,11 @@ import (
 	. "github.com/smartystreets/goconvey/convey"
 	"github.com/wtsi-hgi/go-softpack-builder/build"
 	"github.com/wtsi-hgi/go-softpack-builder/config"
-	"github.com/wtsi-hgi/go-softpack-builder/internal"
-	"github.com/wtsi-hgi/go-softpack-builder/internal/core"
+	"github.com/wtsi-hgi/go-softpack-builder/core"
+	"github.com/wtsi-hgi/go-softpack-builder/internal/coremock"
 	"github.com/wtsi-hgi/go-softpack-builder/internal/gitmock"
+	"github.com/wtsi-hgi/go-softpack-builder/internal/s3mock"
+	"github.com/wtsi-hgi/go-softpack-builder/internal/wrmock"
 )
 
 type mockBuilder struct {
@@ -79,7 +81,7 @@ func TestServerMock(t *testing.T) {
 			EnvironmentName:    "myenv",
 			EnvironmentVersion: "0.8.1",
 			Description:        "help text",
-			Packages: []build.Package{
+			Packages: []core.Package{
 				{
 					Name:    "xxhash",
 					Version: "0.8.1",
@@ -182,10 +184,10 @@ func TestServerMock(t *testing.T) {
 
 func TestServerReal(t *testing.T) {
 	Convey("With a real builder", t, func() {
-		ms3 := &internal.MockS3{}
+		ms3 := &s3mock.MockS3{}
 		mockStatusPollInterval := 1 * time.Millisecond
-		mwr := internal.NewMockWR(mockStatusPollInterval, 10*time.Millisecond)
-		mc := &core.MockCore{Files: make(map[string]string)}
+		mwr := wrmock.NewMockWR(mockStatusPollInterval, 10*time.Millisecond)
+		mc := &coremock.MockCore{Files: make(map[string]string)}
 		msc := httptest.NewServer(mc)
 
 		gm, _ := gitmock.New()

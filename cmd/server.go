@@ -30,7 +30,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/wtsi-hgi/go-softpack-builder/build"
-	"github.com/wtsi-hgi/go-softpack-builder/internal"
+	"github.com/wtsi-hgi/go-softpack-builder/config"
 	"github.com/wtsi-hgi/go-softpack-builder/reindex"
 	"github.com/wtsi-hgi/go-softpack-builder/server"
 )
@@ -132,7 +132,7 @@ past reindexHours, and only if a reindex is not still ongoing.
 			slog.SetDefault(slog.New(h))
 		}
 
-		conf, err := internal.GetConfig(configPath)
+		conf, err := config.GetConfig(configPath)
 		if err != nil {
 			die("could not load config: %s", err)
 		}

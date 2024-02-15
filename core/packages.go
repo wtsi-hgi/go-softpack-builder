@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2023 Genome Research Ltd.
+ * Copyright (c) 2024 Genome Research Ltd.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -21,37 +21,44 @@
  * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  ******************************************************************************/
 
-package internal
+package core
 
-import (
-	"fmt"
-	"os"
-	"path/filepath"
+import "github.com/wtsi-hgi/go-softpack-builder/internal"
 
-	"github.com/wtsi-hgi/go-softpack-builder/config"
+const (
+	ErrNoPackages    = internal.Error("packages required")
+	ErrNoPackageName = internal.Error("package names required")
 )
 
-func GetConfig(configPath string) (*config.Config, error) {
-	if configPath == "" {
-		home, err := os.UserHomeDir()
-		if err != nil {
-			return nil, Error(fmt.Sprintf("could not get home dir: %s", err))
+// Package describes the name and optional version of a spack package.
+type Package struct {
+	Name    string `json:"name"`
+	Version string `json:"version"`
+}
+
+// Validate returns an error if Name isn't set.
+func (p *Package) Validate() error {
+	if p.Name == "" {
+		return ErrNoPackageName
+	}
+
+	return nil
+}
+
+type Packages []Package
+
+// Validate returns an error if p is zero length, or any of its Packages are
+// invalid.
+func (p Packages) Validate() error {
+	if len(p) == 0 {
+		return ErrNoPackages
+	}
+
+	for _, pkg := range p {
+		if pkg.Name == "" {
+			return ErrNoPackageName
 		}
-
-		configPath = filepath.Join(home, ".softpack", "builder", "gsb-config.yml")
 	}
 
-	f, err := os.Open(configPath)
-	if err != nil {
-		return nil, err
-	}
-
-	conf, err := config.Parse(f)
-	f.Close()
-
-	if err != nil {
-		return nil, err
-	}
-
-	return conf, nil
+	return nil
 }

@@ -29,16 +29,58 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"path/filepath"
 	"strings"
 
 	"github.com/wtsi-hgi/go-softpack-builder/config"
+	"github.com/wtsi-hgi/go-softpack-builder/internal"
 )
 
-const graphQLEndpoint = "/graphql"
+const (
+	SingularityDefBasename = "singularity.def"
+	ExesBasename           = "executables"
+	SoftpackYaml           = "softpack.yml"
+	SpackLockFile          = "spack.lock"
+	BuilderOut             = "builder.out"
+	ModuleForCoreBasename  = "module"
+	UsageBasename          = "README.md"
+	ImageBasename          = "singularity.sif"
+
+	graphQLEndpoint = "/graphql"
+)
+
+type gqlVariables struct {
+	Name        string   `json:"name"`
+	Path        string   `json:"path"`
+	Description string   `json:"description,omitempty"`
+	Packages    Packages `json:"packages,omitempty"`
+}
+
+func newGQLVariables(fullPath, desc string, pkgs Packages) gqlVariables {
+	return gqlVariables{
+		Name:        filepath.Base(fullPath),
+		Path:        filepath.Dir(fullPath),
+		Description: desc,
+		Packages:    pkgs,
+	}
+}
 
 type gqlQuery struct {
 	Variables gqlVariables `json:"variables"`
 	Query     string       `json:"query"`
+}
+
+type Response struct {
+	Data struct {
+		CreateEnvironment *struct {
+			TypeName string `json:"__typename"`
+			Message  string `json:"message"`
+		} `json:"createEnvironment"`
+		DeleteEnvironment *struct {
+			TypeName string `json:"__typename"`
+			Message  string `json:"message"`
+		} `json:"deleteEnvironment"`
+	} `json:"data"`
 }
 
 type Core struct {
@@ -59,7 +101,7 @@ func toJSON(thing any) io.Reader {
 	return &buf
 }
 
-func (c *Core) doCoreRequest(graphQLPacket io.Reader) (*http.Response, error) {
+func (c *Core) doCoreRequest(graphQLPacket io.Reader) error {
 	req, err := http.NewRequestWithContext(
 		context.Background(),
 		http.MethodPost,
@@ -67,10 +109,38 @@ func (c *Core) doCoreRequest(graphQLPacket io.Reader) (*http.Response, error) {
 		graphQLPacket,
 	)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	req.Header.Add("Content-Type", "application/json")
 
-	return http.DefaultClient.Do(req)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+
+	return handleCoreResponse(resp)
+}
+
+func handleCoreResponse(resp *http.Response) error {
+	var cr Response
+
+	err := json.NewDecoder(resp.Body).Decode(&cr)
+	if err != nil {
+		return err
+	}
+
+	if cr.Data.DeleteEnvironment != nil {
+		if cr.Data.DeleteEnvironment.TypeName != removeMutationSuccess {
+			return internal.Error(cr.Data.DeleteEnvironment.Message)
+		}
+	}
+
+	if cr.Data.CreateEnvironment != nil {
+		if cr.Data.CreateEnvironment.TypeName != createMutationSuccess {
+			return internal.Error(cr.Data.CreateEnvironment.Message)
+		}
+	}
+
+	return nil
 }

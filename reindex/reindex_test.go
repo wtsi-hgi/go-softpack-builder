@@ -35,7 +35,7 @@ import (
 	. "github.com/smartystreets/goconvey/convey"
 	"github.com/wtsi-hgi/go-softpack-builder/build"
 	"github.com/wtsi-hgi/go-softpack-builder/config"
-	"github.com/wtsi-hgi/go-softpack-builder/internal"
+	"github.com/wtsi-hgi/go-softpack-builder/internal/tests"
 )
 
 const userPerms = 0700
@@ -126,7 +126,7 @@ func TestReindex(t *testing.T) {
 		})
 
 		Convey("Spack errors are logged", func() {
-			var logWriter internal.ConcurrentStringBuilder
+			var logWriter tests.ConcurrentStringBuilder
 			slog.SetDefault(slog.New(slog.NewTextHandler(&logWriter, nil)))
 
 			conf.S3.BinaryCache = "/bad"
@@ -141,7 +141,7 @@ func TestReindex(t *testing.T) {
 		})
 
 		Convey("An error is logged when Spack isn't available", func() {
-			var logWriter internal.ConcurrentStringBuilder
+			var logWriter tests.ConcurrentStringBuilder
 			slog.SetDefault(slog.New(slog.NewTextHandler(&logWriter, nil)))
 
 			conf.Spack.Path = "/non-existent"

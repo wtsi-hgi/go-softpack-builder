@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2024 Genome Research Ltd.
+ * Copyright (c) 2023 Genome Research Ltd.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -21,37 +21,46 @@
  * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  ******************************************************************************/
 
-package core
+package tests
 
-const createMutationSuccess = "CreateEnvironmentSuccess"
+import (
+	"embed"
+	"strings"
+	"sync"
+)
 
-const createMutationQuery = `
-mutation ($name: String!, $description: String!, $path: String!, $packages: [PackageInput!]!) {
-	createEnvironment(
-		env: {name: $name, description: $description, path: $path, packages: $packages}
-	) {
-		__typename
-		... on ` + createMutationSuccess + ` {
-			message
-			__typename
-		}
-		... on Error {
-			message
-			__typename
-		}
-	}
-}
-`
+//go:embed testdata
+var TestData embed.FS
 
-func newCreateMutation(path, description string, packages Packages) *gqlQuery {
-	return &gqlQuery{
-		Variables: newGQLVariables(path, description, packages),
-		Query:     createMutationQuery,
-	}
+// ConcurrentStringBuilder should be used when testing slog logging:
+//
+//	var logWriter internal.ConcurrentStringBuilder
+//	slog.SetDefault(slog.New(slog.NewTextHandler(&logWriter, nil)))
+type ConcurrentStringBuilder struct {
+	mu sync.RWMutex
+	strings.Builder
 }
 
-func (c *Core) Create(path, desc string, pkgs Packages) error {
-	gq := newCreateMutation(path, desc, pkgs)
+// Write is for implementing io.Writer.
+func (c *ConcurrentStringBuilder) Write(p []byte) (int, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 
-	return c.doCoreRequest(toJSON(gq))
+	return c.Builder.Write(p)
+}
+
+// WriteString is for implementing io.Writer.
+func (c *ConcurrentStringBuilder) WriteString(str string) (int, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	return c.Builder.WriteString(str)
+}
+
+// String returns the current logs messages as a string.
+func (c *ConcurrentStringBuilder) String() string {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	return c.Builder.String()
 }

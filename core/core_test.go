@@ -27,15 +27,14 @@ import (
 	"testing"
 
 	. "github.com/smartystreets/goconvey/convey"
-	"github.com/wtsi-hgi/go-softpack-builder/build"
-	"github.com/wtsi-hgi/go-softpack-builder/internal"
+	"github.com/wtsi-hgi/go-softpack-builder/config"
 )
 
 func TestCore(t *testing.T) {
 	Convey("Given a path, description and packages", t, func() {
 		path := "users/foo/env"
 		desc := "a desc"
-		pkgs := build.Packages{
+		pkgs := Packages{
 			{
 				Name:    "pckA",
 				Version: "1",
@@ -60,19 +59,31 @@ func TestCore(t *testing.T) {
 			})
 		})
 
+		conf, err := config.GetConfig("")
+		if err != nil || conf.CoreURL == "" {
+			SkipConvey("Skipping further tests, set CoreURL in config file", func() {})
+
+			return
+		}
+
+		core := New(conf)
+
 		Convey("You can create an environment", func() {
-			conf, err := internal.GetConfig("")
-			if err != nil || conf.CoreURL == "" {
-				SkipConvey("Skipping test, set CoreURL in config file", func() {})
-
-				return
-			}
-
-			core := New(conf)
-
-			resp, err := core.Create(path, desc, pkgs)
+			err := core.Create(path, desc, pkgs)
 			So(err, ShouldBeNil)
-			So(string(resp), ShouldContainSubstring, "Successfully scheduled environment creation")
+
+			Convey("Then remove it", func() {
+				err := core.Remove(path + "-1")
+				So(err, ShouldBeNil)
+
+				err = core.Remove(path + "-1")
+				So(err, ShouldNotBeNil)
+			})
+		})
+
+		Convey("You can't create an environment with empty path", func() {
+			err := core.Create("", desc, pkgs)
+			So(err, ShouldNotBeNil)
 		})
 	})
 }

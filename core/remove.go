@@ -23,35 +23,36 @@
 
 package core
 
-const createMutationSuccess = "CreateEnvironmentSuccess"
+const removeMutationSuccess = "DeleteEnvironmentSuccess"
 
-const createMutationQuery = `
-mutation ($name: String!, $description: String!, $path: String!, $packages: [PackageInput!]!) {
-	createEnvironment(
-		env: {name: $name, description: $description, path: $path, packages: $packages}
+const removeMutationQuery = `
+mutation ($name: String!, $path: String!) {
+	deleteEnvironment(
+		name: $name
+		path: $path
 	) {
 		__typename
-		... on ` + createMutationSuccess + ` {
+		... on ` + removeMutationSuccess + ` {
 			message
-			__typename
 		}
-		... on Error {
+		... on EnvironmentNotFoundError {
 			message
-			__typename
+			path
+			name
 		}
 	}
 }
 `
 
-func newCreateMutation(path, description string, packages Packages) *gqlQuery {
+func newRemoveMutation(path string) *gqlQuery {
 	return &gqlQuery{
-		Variables: newGQLVariables(path, description, packages),
-		Query:     createMutationQuery,
+		Variables: newGQLVariables(path, "", nil),
+		Query:     removeMutationQuery,
 	}
 }
 
-func (c *Core) Create(path, desc string, pkgs Packages) error {
-	gq := newCreateMutation(path, desc, pkgs)
+func (c *Core) Remove(path string) error {
+	gq := newRemoveMutation(path)
 
 	return c.doCoreRequest(toJSON(gq))
 }

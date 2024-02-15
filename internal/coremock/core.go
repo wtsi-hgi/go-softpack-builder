@@ -21,7 +21,7 @@
  * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  ******************************************************************************/
 
-package core
+package coremock
 
 import (
 	"errors"
@@ -31,17 +31,6 @@ import (
 	"net/url"
 	"path/filepath"
 	"sync"
-)
-
-const (
-	SingularityDefBasename = "singularity.def"
-	ExesBasename           = "executables"
-	SoftpackYaml           = "softpack.yml"
-	SpackLockFile          = "spack.lock"
-	BuilderOut             = "builder.out"
-	ModuleForCoreBasename  = "module"
-	UsageBasename          = "README.md"
-	ImageBasename          = "singularity.sif"
 )
 
 type MockCore struct {

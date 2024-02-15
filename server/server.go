@@ -30,6 +30,7 @@ import (
 	"path"
 
 	"github.com/wtsi-hgi/go-softpack-builder/build"
+	"github.com/wtsi-hgi/go-softpack-builder/core"
 )
 
 const (
@@ -55,10 +56,10 @@ type Builder interface {
 // environment.
 type Request struct {
 	Name    string
-	Version string `json:"omitempty"`
+	Version string `json:"version,omitempty"`
 	Model   struct {
 		Description string
-		Packages    []build.Package
+		Packages    []core.Package
 	}
 }
 
@@ -83,6 +84,7 @@ func handleEnvBuild(b Builder, w http.ResponseWriter, r *http.Request) {
 	req := new(Request)
 
 	if err := json.NewDecoder(r.Body).Decode(req); err != nil {
+		fmt.Printf("\na: %s\n", err)
 		http.Error(w, fmt.Sprintf("error parsing request: %s", err), http.StatusBadRequest)
 
 		return
@@ -95,6 +97,7 @@ func handleEnvBuild(b Builder, w http.ResponseWriter, r *http.Request) {
 	def.Packages = req.Model.Packages
 
 	if err := def.Validate(); err != nil {
+		fmt.Printf("\nb: %s\n", err)
 		http.Error(w, fmt.Sprintf("error validating request: %s", err), http.StatusBadRequest)
 	}
 

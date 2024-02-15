@@ -15,7 +15,7 @@ import (
 	. "github.com/smartystreets/goconvey/convey"
 	"github.com/wtsi-hgi/go-softpack-builder/build"
 	"github.com/wtsi-hgi/go-softpack-builder/config"
-	"github.com/wtsi-hgi/go-softpack-builder/internal/core"
+	"github.com/wtsi-hgi/go-softpack-builder/core"
 )
 
 const groupsDir = "groups"
@@ -38,7 +38,7 @@ func TestRemove(t *testing.T) {
 
 		envPath := filepath.Join(groupsDir, group, env)
 
-		var response coreResponse
+		var response core.Response
 
 		mockCore := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			json.NewEncoder(w).Encode(response) //nolint:errcheck
