@@ -23,16 +23,16 @@
 
 package core
 
-const removeMutationSuccess = "DeleteEnvironmentSuccess"
+const DeleteMutationSuccess = "DeleteEnvironmentSuccess"
 
-const removeMutationQuery = `
+const deleteMutationQuery = `
 mutation ($name: String!, $path: String!) {
 	deleteEnvironment(
 		name: $name
 		path: $path
 	) {
 		__typename
-		... on ` + removeMutationSuccess + ` {
+		... on ` + DeleteMutationSuccess + ` {
 			message
 		}
 		... on EnvironmentNotFoundError {
@@ -44,15 +44,15 @@ mutation ($name: String!, $path: String!) {
 }
 `
 
-func newRemoveMutation(path string) *gqlQuery {
+func newDeleteMutation(path string) *gqlQuery {
 	return &gqlQuery{
 		Variables: newGQLVariables(path, "", nil),
-		Query:     removeMutationQuery,
+		Query:     deleteMutationQuery,
 	}
 }
 
-func (c *Core) Remove(path string) error {
-	gq := newRemoveMutation(path)
+func (c *Core) Delete(path string) error {
+	gq := newDeleteMutation(path)
 
 	return c.doCoreRequest(toJSON(gq))
 }

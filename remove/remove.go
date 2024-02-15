@@ -74,7 +74,7 @@ func Remove(conf *config.Config, s3r s3Remover, envPath, version string) error {
 
 	core := core.New(conf)
 
-	err := core.Remove(envPath + "-" + version)
+	err := core.Delete(envPath + "-" + version)
 	if err != nil {
 		return err
 	}

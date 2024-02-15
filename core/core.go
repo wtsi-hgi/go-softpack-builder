@@ -70,16 +70,15 @@ type gqlQuery struct {
 	Query     string       `json:"query"`
 }
 
+type EnvironmentResponse struct {
+	TypeName string `json:"__typename"`
+	Message  string `json:"message"`
+}
+
 type Response struct {
 	Data struct {
-		CreateEnvironment *struct {
-			TypeName string `json:"__typename"`
-			Message  string `json:"message"`
-		} `json:"createEnvironment"`
-		DeleteEnvironment *struct {
-			TypeName string `json:"__typename"`
-			Message  string `json:"message"`
-		} `json:"deleteEnvironment"`
+		CreateEnvironment *EnvironmentResponse `json:"createEnvironment"`
+		DeleteEnvironment *EnvironmentResponse `json:"deleteEnvironment"`
 	} `json:"data"`
 }
 
@@ -131,7 +130,7 @@ func handleCoreResponse(resp *http.Response) error {
 	}
 
 	if cr.Data.DeleteEnvironment != nil {
-		if cr.Data.DeleteEnvironment.TypeName != removeMutationSuccess {
+		if cr.Data.DeleteEnvironment.TypeName != DeleteMutationSuccess {
 			return internal.Error(cr.Data.DeleteEnvironment.Message)
 		}
 	}

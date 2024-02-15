@@ -167,9 +167,9 @@ func uniqueRunArgs(cmd, limitGrp string) (string, string) {
 }
 
 func getWRStatus(deployment, repGrp string) string {
-	cmd := exec.Command("wr", "status", "--deployment", deployment, "-i", repGrp, "-o", "json") //nolint:gosec
-	var stdout bytes.Buffer
-	var stderr bytes.Buffer
+	cmd := exec.Command("wr", "status", "--deployment", deployment, "-i", repGrp, "-o", "json")
+
+	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 

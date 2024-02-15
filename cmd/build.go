@@ -27,6 +27,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"net/http"
 	"net/url"
 	"os"
 	"strings"
@@ -51,34 +52,35 @@ Allows manual builds without a softpack client.`,
 			die("invalid gsb URL supplied: %s", err)
 		}
 
-		// 		query := NewGqlQuery(
-		// 			readInput("Enter environment path: ", buildPath),
-		// 			readInput("Enter environment description (single line): ", buildDescription),
-		// 			getPackageList(buildPackagesPath),
-		// 		)
-		//
-		// 		pr, pw := io.Pipe()
-		//
-		// 		go func() {
-		// 			query.toJSON(pw)
-		// 			pw.Close()
-		// 		}()
-		//
-		// 		req, err := http.NewRequest(http.MethodPost, buildURL, pr)
-		// 		if err != nil {
-		// 			die("failed to create build request: %s", err)
-		// 		}
-		//
-		// 		req.Header.Add("Content-Type", "application/json")
-		//
-		// 		resp, err := http.DefaultClient.Do(req)
-		// 		if err != nil {
-		// 			die("failed to send request to builder: %s", err)
-		// 		}
-		//
-		// 		if _, err = io.Copy(os.Stdout, resp.Body); err != nil {
-		// 			die("failed to copy response to stdout: %s", err)
-		// 		}
+		// TODO: implement this
+		query := NewGqlQuery(
+			readInput("Enter environment path: ", buildPath),
+			readInput("Enter environment description (single line): ", buildDescription),
+			getPackageList(buildPackagesPath),
+		)
+
+		pr, pw := io.Pipe()
+
+		go func() {
+			query.toJSON(pw)
+			pw.Close()
+		}()
+
+		req, err := http.NewRequest(http.MethodPost, buildURL, pr)
+		if err != nil {
+			die("failed to create build request: %s", err)
+		}
+
+		req.Header.Add("Content-Type", "application/json")
+
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			die("failed to send request to builder: %s", err)
+		}
+
+		if _, err = io.Copy(os.Stdout, resp.Body); err != nil {
+			die("failed to copy response to stdout: %s", err)
+		}
 	},
 }
 

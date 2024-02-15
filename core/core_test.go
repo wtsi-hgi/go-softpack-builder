@@ -73,10 +73,10 @@ func TestCore(t *testing.T) {
 			So(err, ShouldBeNil)
 
 			Convey("Then remove it", func() {
-				err := core.Remove(path + "-1")
+				err := core.Delete(path + "-1")
 				So(err, ShouldBeNil)
 
-				err = core.Remove(path + "-1")
+				err = core.Delete(path + "-1")
 				So(err, ShouldNotBeNil)
 			})
 		})

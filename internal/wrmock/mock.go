@@ -87,7 +87,7 @@ func (m *MockWR) WaitForRunning(string) error { //nolint:unparam
 }
 
 // Wait implements build.Runner interface.
-func (m *MockWR) Wait(string) (wr.WRJobStatus, error) {
+func (m *MockWR) Wait(string) (wr.WRJobStatus, error) { //nolint:unparam
 	<-time.After(m.JobDuration)
 
 	if m.Fail {
