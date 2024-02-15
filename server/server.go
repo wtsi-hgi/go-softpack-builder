@@ -55,7 +55,7 @@ type Builder interface {
 // environment.
 type Request struct {
 	Name    string
-	Version string
+	Version string `json:"omitempty"`
 	Model   struct {
 		Description string
 		Packages    []build.Package

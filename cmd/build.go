@@ -25,7 +25,6 @@ package cmd
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -35,7 +34,6 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/wtsi-hgi/go-softpack-builder/build"
-	"github.com/wtsi-hgi/go-softpack-builder/server"
 	"golang.org/x/sys/unix"
 )
 
@@ -54,17 +52,16 @@ Allows manual builds without a softpack client.`,
 			die("invalid gsb URL supplied: %s", err)
 		}
 
-		var p server.Request
-
-		p.Name = readInput("Enter environment path: ", buildPath)
-		p.Version = readInput("Enter environment version: ", buildVersion)
-		p.Model.Description = readInput("Enter environment description (single line): ", buildDescription)
-		p.Model.Packages = getPackageList(buildPackagesPath)
+		query := NewGqlQuery(
+			readInput("Enter environment path: ", buildPath),
+			readInput("Enter environment description (single line): ", buildDescription),
+			getPackageList(buildPackagesPath),
+		)
 
 		pr, pw := io.Pipe()
 
 		go func() {
-			json.NewEncoder(pw).Encode(p) //nolint:errcheck
+			query.toJSON(pw)
 			pw.Close()
 		}()
 
@@ -72,6 +69,8 @@ Allows manual builds without a softpack client.`,
 		if err != nil {
 			die("failed to create build request: %s", err)
 		}
+
+		req.Header.Add("Content-Type", "application/json")
 
 		resp, err := http.DefaultClient.Do(req)
 		if err != nil {
@@ -88,7 +87,6 @@ func init() {
 	RootCmd.AddCommand(buildCmd)
 
 	buildCmd.Flags().StringVarP(&buildPath, "path", "p", "", "environment path")
-	buildCmd.Flags().StringVarP(&buildVersion, "version", "v", "1.0", "environment version")
 	buildCmd.Flags().StringVarP(&buildDescription, "description", "d", "", "environment description")
 	buildCmd.Flags().StringVarP(&buildPackagesPath, "packages", "k", "-", "file with list of packages, one per line")
 	buildCmd.Flags().StringVarP(&buildURL, "url", "u", os.Getenv("GSB_URL"), "URL to running GSB server")

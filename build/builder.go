@@ -79,8 +79,8 @@ const (
 
 // Package describes the name and optional version of a spack package.
 type Package struct {
-	Name    string
-	Version string
+	Name    string `json:"name"`
+	Version string `json:"version"`
 }
 
 // Validate returns an error if Name isn't set.
@@ -507,7 +507,7 @@ func (b *Builder) prepareArtifactsFromS3AndSendToCoreAndS3(def *Definition, s3Pa
 		return err
 	}
 
-	concreteSpackYAMLFile, err := b.generateAndUploadSpackYAML(lockData, def.Description, exes, s3Path)
+	concreteSpackYAMLFile, err := b.generateAndUploadSoftpackYAML(lockData, def.Description, exes, s3Path)
 	if err != nil {
 		return err
 	}
@@ -549,19 +549,19 @@ func (b *Builder) getArtifactDataFromS3(s3Path string) (io.Reader, []byte, error
 	return logData, lockData, nil
 }
 
-func (b *Builder) generateAndUploadSpackYAML(lockData []byte, description string,
+func (b *Builder) generateAndUploadSoftpackYAML(lockData []byte, description string,
 	exes []string, s3Path string) (string, error) {
-	concreteSpackYAMLFile, err := SpackLockToSoftPackYML(lockData, description, exes)
+	concreteSoftpackYAMLFile, err := SpackLockToSoftPackYML(lockData, description, exes)
 	if err != nil {
 		return "", err
 	}
 
-	if err = b.s3.UploadData(strings.NewReader(concreteSpackYAMLFile),
+	if err = b.s3.UploadData(strings.NewReader(concreteSoftpackYAMLFile),
 		filepath.Join(s3Path, core.SoftpackYaml)); err != nil {
 		return "", err
 	}
 
-	return concreteSpackYAMLFile, nil
+	return concreteSoftpackYAMLFile, nil
 }
 
 type ConcreteSpec struct {

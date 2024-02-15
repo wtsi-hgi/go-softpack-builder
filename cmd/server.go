@@ -27,11 +27,10 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
-	"path/filepath"
 
 	"github.com/spf13/cobra"
 	"github.com/wtsi-hgi/go-softpack-builder/build"
-	"github.com/wtsi-hgi/go-softpack-builder/config"
+	"github.com/wtsi-hgi/go-softpack-builder/internal"
 	"github.com/wtsi-hgi/go-softpack-builder/reindex"
 	"github.com/wtsi-hgi/go-softpack-builder/server"
 )
@@ -133,7 +132,10 @@ past reindexHours, and only if a reindex is not still ongoing.
 			slog.SetDefault(slog.New(h))
 		}
 
-		conf := getConfig()
+		conf, err := internal.GetConfig(configPath)
+		if err != nil {
+			die("could not load config: %s", err)
+		}
 
 		b, err := build.New(conf, nil, nil)
 		if err != nil {
@@ -158,29 +160,4 @@ func init() {
 		"path to config file")
 	serverCmd.Flags().BoolVar(&debug, "debug", false,
 		"turn on debug logging output")
-}
-
-func getConfig() *config.Config {
-	if configPath == "" {
-		home, err := os.UserHomeDir()
-		if err != nil {
-			die("could not get home dir: %s", err)
-		}
-
-		configPath = filepath.Join(home, ".softpack", "builder", "gsb-config.yml")
-	}
-
-	f, err := os.Open(configPath)
-	if err != nil {
-		die("could not open config file: %s", err)
-	}
-
-	conf, err := config.Parse(f)
-	f.Close()
-
-	if err != nil {
-		die("could not parse config file: %s", err)
-	}
-
-	return conf
 }

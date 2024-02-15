@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 
 	"github.com/spf13/cobra"
+	"github.com/wtsi-hgi/go-softpack-builder/internal"
 	"github.com/wtsi-hgi/go-softpack-builder/remove"
 	"github.com/wtsi-hgi/go-softpack-builder/s3"
 )
@@ -34,7 +35,10 @@ Usage: gsb remove softpack/env/path version
 			die("unexpected arguments")
 		}
 
-		conf := getConfig()
+		conf, err := internal.GetConfig(configPath)
+		if err != nil {
+			die("could not load config: %s", err)
+		}
 
 		s, err := s3.New(conf.S3.BuildBase)
 		if err != nil {

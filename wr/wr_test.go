@@ -85,16 +85,8 @@ func TestWR(t *testing.T) {
 		So(status, ShouldEqual, WRJobStatusComplete)
 		So(time.Since(now), ShouldBeGreaterThan, 2*time.Second)
 
-		cmd := exec.Command("wr", "status", "--deployment", runner.deployment, "-i", repGrp, "-o", "json") //nolint:gosec
-		var stdout bytes.Buffer
-		var stderr bytes.Buffer
-		cmd.Stdout = &stdout
-		cmd.Stderr = &stderr
-
-		err = cmd.Run()
-		So(err, ShouldBeNil)
-		So(stderr.String(), ShouldBeBlank)
-		So(stdout.String(), ShouldContainSubstring, `"State":"complete"`)
+		statusOut := getWRStatus(runner.deployment, repGrp)
+		So(statusOut, ShouldContainSubstring, `"State":"complete"`)
 
 		jobID2, err := runner.Add(runArgs)
 		So(err, ShouldBeNil)
@@ -105,7 +97,7 @@ func TestWR(t *testing.T) {
 		So(err, ShouldBeNil)
 		So(status, ShouldEqual, WRJobStatusComplete)
 
-		runArgs, _ = uniqueRunArgs("false", "")
+		runArgs, repGrp = uniqueRunArgs("false", "")
 		jobID, err = runner.Add(runArgs)
 		So(err, ShouldBeNil)
 		err = runner.WaitForRunning(jobID)
@@ -113,6 +105,18 @@ func TestWR(t *testing.T) {
 		status, err = runner.Wait(jobID)
 		So(err, ShouldBeNil)
 		So(status, ShouldEqual, WRJobStatusBuried)
+
+		Convey("You can clean up buried jobs", func() {
+			err = runner.Cleanup()
+			So(err, ShouldBeNil)
+
+			statusOut := getWRStatus(runner.deployment, repGrp)
+			So(statusOut, ShouldEqual, "[]\n\n")
+		})
+	})
+
+	Convey("You can clean up running jobs", t, func() {
+		// TODO
 	})
 
 	Convey("WaitForRunning returns when the build starts running", t, func() {
@@ -160,4 +164,18 @@ func uniqueRunArgs(cmd, limitGrp string) (string, string) {
 
 	return `{"cmd":"` + cmd + ` && echo ` + repGrp + `", "rep_grp": "` + repGrp +
 		`", "limit_grps": ["` + limitGrp + `"], "retries": 0}`, repGrp
+}
+
+func getWRStatus(deployment, repGrp string) string {
+	cmd := exec.Command("wr", "status", "--deployment", deployment, "-i", repGrp, "-o", "json") //nolint:gosec
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	err := cmd.Run()
+	So(err, ShouldBeNil)
+	So(stderr.String(), ShouldBeBlank)
+
+	return stdout.String()
 }
