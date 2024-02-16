@@ -35,8 +35,7 @@ import (
 	"github.com/wtsi-hgi/go-softpack-builder/server"
 )
 
-// global options.
-var configPath string
+// Options for this sub-command.
 var debug bool
 
 var serverCmd = &cobra.Command{
@@ -156,8 +155,6 @@ past reindexHours, and only if a reindex is not still ongoing.
 func init() {
 	RootCmd.AddCommand(serverCmd)
 
-	serverCmd.Flags().StringVar(&configPath, "config", "",
-		"path to config file")
 	serverCmd.Flags().BoolVar(&debug, "debug", false,
 		"turn on debug logging output")
 }

@@ -34,6 +34,9 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// global options.
+var configPath string
+
 // RootCmd represents the base command when called without any subcommands.
 var RootCmd = &cobra.Command{
 	Use:   os.Args[0],
@@ -45,6 +48,11 @@ subcommand to build new softpack environments.
 `,
 }
 
+func init() {
+	RootCmd.PersistentFlags().StringVar(&configPath, "config", "",
+		"path to config file")
+}
+
 // Execute adds all child commands to the root command and sets flags
 // appropriately. This is called by main.main(). It only needs to happen once to
 // the rootCmd.
@@ -52,6 +60,11 @@ func Execute() {
 	if err := RootCmd.Execute(); err != nil {
 		die(err.Error())
 	}
+}
+
+// info is a convenience to log a message at the Info level.
+func info(msg string, a ...interface{}) {
+	slog.Info(fmt.Sprintf(msg, a...))
 }
 
 // die is a convenience to log a message at the Error level and exit non zero.

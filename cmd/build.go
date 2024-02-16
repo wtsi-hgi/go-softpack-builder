@@ -27,16 +27,16 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"net/http"
-	"net/url"
 	"os"
 	"strings"
 
 	"github.com/spf13/cobra"
+	"github.com/wtsi-hgi/go-softpack-builder/config"
 	"github.com/wtsi-hgi/go-softpack-builder/core"
 	"golang.org/x/sys/unix"
 )
 
+// Options for this sub-command.
 var buildPath, buildVersion, buildDescription, buildPackagesPath, buildURL string
 
 var buildCmd = &cobra.Command{
@@ -46,41 +46,25 @@ var buildCmd = &cobra.Command{
 
 Allows manual builds without a softpack client.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		if buildURL == "" {
-			die("no gsb URL supplied")
-		} else if _, err := url.Parse(buildURL); err != nil {
-			die("invalid gsb URL supplied: %s", err)
-		}
-
-		// TODO: implement this
-		query := NewGqlQuery(
-			readInput("Enter environment path: ", buildPath),
-			readInput("Enter environment description (single line): ", buildDescription),
-			getPackageList(buildPackagesPath),
-		)
-
-		pr, pw := io.Pipe()
-
-		go func() {
-			query.toJSON(pw)
-			pw.Close()
-		}()
-
-		req, err := http.NewRequest(http.MethodPost, buildURL, pr)
+		conf, err := config.GetConfig(configPath)
 		if err != nil {
-			die("failed to create build request: %s", err)
+			die("could not load config: %s", err)
 		}
 
-		req.Header.Add("Content-Type", "application/json")
-
-		resp, err := http.DefaultClient.Do(req)
+		c, err := core.New(conf)
 		if err != nil {
-			die("failed to send request to builder: %s", err)
+			die("failed to load core config: %s", err)
 		}
 
-		if _, err = io.Copy(os.Stdout, resp.Body); err != nil {
-			die("failed to copy response to stdout: %s", err)
+		path := readInput("Enter environment path: ", buildPath)
+		desc := readInput("Enter environment description (single line): ", buildDescription)
+		pkgs := getPackageList(buildPackagesPath)
+		err = c.Create(path, desc, pkgs)
+		if err != nil {
+			die("failed to create environment: %s", err)
 		}
+
+		info("environment build successfully scheduled")
 	},
 }
 

@@ -51,6 +51,7 @@ func newDeleteMutation(path string) *gqlQuery {
 	}
 }
 
+// Delete contacts the core to delete an environment.
 func (c *Core) Delete(path string) error {
 	gq := newDeleteMutation(path)
 

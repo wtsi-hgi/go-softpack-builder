@@ -61,12 +61,16 @@ func TestCore(t *testing.T) {
 
 		conf, err := config.GetConfig("")
 		if err != nil || conf.CoreURL == "" {
+			_, err = New(conf)
+			So(err, ShouldNotBeNil)
+
 			SkipConvey("Skipping further tests, set CoreURL in config file", func() {})
 
 			return
 		}
 
-		core := New(conf)
+		core, err := New(conf)
+		So(err, ShouldBeNil)
 
 		Convey("You can create an environment", func() {
 			err := core.Create(path, desc, pkgs)

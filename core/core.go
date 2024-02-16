@@ -45,6 +45,7 @@ const (
 	ModuleForCoreBasename  = "module"
 	UsageBasename          = "README.md"
 	ImageBasename          = "singularity.sif"
+	ErrNoCoreURL           = "no coreURL specified in config"
 
 	graphQLEndpoint = "/graphql"
 )
@@ -70,11 +71,13 @@ type gqlQuery struct {
 	Query     string       `json:"query"`
 }
 
+// EnvironmentResponse is the kind of return value we get from the core.
 type EnvironmentResponse struct {
 	TypeName string `json:"__typename"`
 	Message  string `json:"message"`
 }
 
+// Response represents a response to a GraphQL operation.
 type Response struct {
 	Data struct {
 		CreateEnvironment *EnvironmentResponse `json:"createEnvironment"`
@@ -82,14 +85,20 @@ type Response struct {
 	} `json:"data"`
 }
 
+// Core is used to interact with a real softpack-core service.
 type Core struct {
 	url string
 }
 
-func New(conf *config.Config) *Core {
+// New creates a new Core struct, to contact the core via its configured URL.
+func New(conf *config.Config) (*Core, error) {
+	if conf.CoreURL == "" {
+		return nil, internal.Error(ErrNoCoreURL)
+	}
+
 	return &Core{
 		url: strings.TrimSuffix(conf.CoreURL, "/") + graphQLEndpoint,
-	}
+	}, nil
 }
 
 func toJSON(thing any) io.Reader {

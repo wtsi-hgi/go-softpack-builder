@@ -50,6 +50,7 @@ func newCreateMutation(path, description string, packages Packages) *gqlQuery {
 	}
 }
 
+// Create contacts the core to schedule an environment build.
 func (c *Core) Create(path, desc string, pkgs Packages) error {
 	gq := newCreateMutation(path, desc, pkgs)
 
