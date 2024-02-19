@@ -68,6 +68,9 @@ type Request struct {
 // get status information for builds when it receives a GET request to
 // /environments/status.
 func New(b Builder) http.Handler {
+	// TODO: change things so we return a Server that has a ListenAndServe that
+	// would call core.ResendBuildRequests after we're listening
+
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case endpointEnvsBuild:

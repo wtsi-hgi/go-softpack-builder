@@ -28,7 +28,6 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -37,46 +36,24 @@ import (
 	"github.com/wtsi-hgi/go-softpack-builder/build"
 	"github.com/wtsi-hgi/go-softpack-builder/config"
 	"github.com/wtsi-hgi/go-softpack-builder/core"
+	"github.com/wtsi-hgi/go-softpack-builder/internal/buildermock"
 	"github.com/wtsi-hgi/go-softpack-builder/internal/coremock"
 	"github.com/wtsi-hgi/go-softpack-builder/internal/gitmock"
 	"github.com/wtsi-hgi/go-softpack-builder/internal/s3mock"
 	"github.com/wtsi-hgi/go-softpack-builder/internal/wrmock"
 )
 
-type mockBuilder struct {
-	received  []*build.Definition
-	requested []time.Time
-}
-
-func (m *mockBuilder) Build(def *build.Definition) error {
-	m.received = append(m.received, def)
-
-	return nil
-}
-
-func (m *mockBuilder) Status() []build.Status {
-	statuses := make([]build.Status, len(m.received))
-
-	for i, def := range m.received {
-		statuses[i] = build.Status{
-			Name:      filepath.Join(def.EnvironmentPath, def.EnvironmentName) + "-" + def.EnvironmentVersion,
-			Requested: &m.requested[i],
-		}
-	}
-
-	return statuses
-}
-
 func TestServerMock(t *testing.T) {
 	Convey("Posts to core result in a Definition being sent to Build()", t, func() {
-		mb := new(mockBuilder)
+		mb := new(buildermock.MockBuilder)
 
 		handler := New(mb)
-		server := httptest.NewServer(handler)
+		testServer := httptest.NewServer(handler)
+		defer testServer.Close()
 
-		postToBuildEndpoint(server, "users/user/myenv", "0.8.1")
+		postToBuildEndpoint(testServer, "users/user/myenv", "0.8.1")
 
-		So(mb.received[0], ShouldResemble, &build.Definition{
+		So(mb.Received[0], ShouldResemble, &build.Definition{
 			EnvironmentPath:    "users/user/",
 			EnvironmentName:    "myenv",
 			EnvironmentVersion: "0.8.1",
@@ -141,7 +118,7 @@ func TestServerMock(t *testing.T) {
 					OutputError: "error validating request: package names required\n",
 				},
 			} {
-				resp, err := server.Client().Post(server.URL+endpointEnvsBuild, "application/json", //nolint:noctx
+				resp, err := testServer.Client().Post(testServer.URL+endpointEnvsBuild, "application/json", //nolint:noctx
 					strings.NewReader(test.InputJSON))
 
 				So(err, ShouldBeNil)
@@ -153,8 +130,8 @@ func TestServerMock(t *testing.T) {
 		})
 
 		Convey("After which you can get the queued/building/built status for it", func() {
-			mb.requested = append(mb.requested, time.Now())
-			resp, err := server.Client().Get(server.URL + endpointEnvsStatus) //nolint:noctx
+			mb.Requested = append(mb.Requested, time.Now())
+			resp, err := testServer.Client().Get(testServer.URL + endpointEnvsStatus) //nolint:noctx
 			So(err, ShouldBeNil)
 			So(resp.StatusCode, ShouldEqual, http.StatusOK)
 			var statuses []build.Status
@@ -162,13 +139,13 @@ func TestServerMock(t *testing.T) {
 			So(err, ShouldBeNil)
 			So(len(statuses), ShouldEqual, 1)
 			So(statuses[0].Name, ShouldEqual, "users/user/myenv-0.8.1")
-			So(*statuses[0].Requested, ShouldHappenWithin, 0*time.Microsecond, mb.requested[0])
+			So(*statuses[0].Requested, ShouldHappenWithin, 0*time.Microsecond, mb.Requested[0])
 
-			postToBuildEndpoint(server, "users/user/myotherenv", "1")
+			postToBuildEndpoint(testServer, "users/user/myotherenv", "1")
 
-			mb.requested = append(mb.requested, time.Now())
+			mb.Requested = append(mb.Requested, time.Now())
 
-			resp, err = server.Client().Get(server.URL + endpointEnvsStatus) //nolint:noctx
+			resp, err = testServer.Client().Get(testServer.URL + endpointEnvsStatus) //nolint:noctx
 			So(err, ShouldBeNil)
 			So(resp.StatusCode, ShouldEqual, http.StatusOK)
 			statuses = []build.Status{}
@@ -177,7 +154,7 @@ func TestServerMock(t *testing.T) {
 			So(len(statuses), ShouldEqual, 2)
 			So(statuses[0].Name, ShouldEqual, "users/user/myenv-0.8.1")
 			So(statuses[1].Name, ShouldEqual, "users/user/myotherenv-1")
-			So(*statuses[1].Requested, ShouldHappenWithin, 0*time.Microsecond, mb.requested[1])
+			So(*statuses[1].Requested, ShouldHappenWithin, 0*time.Microsecond, mb.Requested[1])
 		})
 	})
 }
@@ -238,8 +215,8 @@ func TestServerReal(t *testing.T) {
 	})
 }
 
-func postToBuildEndpoint(server *httptest.Server, name, version string) {
-	resp, err := server.Client().Post(server.URL+endpointEnvsBuild, "application/json", //nolint:noctx
+func postToBuildEndpoint(testServer *httptest.Server, name, version string) {
+	resp, err := testServer.Client().Post(testServer.URL+endpointEnvsBuild, "application/json", //nolint:noctx
 		strings.NewReader(`
 {
 	"name": "`+name+`",
@@ -255,8 +232,8 @@ func postToBuildEndpoint(server *httptest.Server, name, version string) {
 	So(resp.StatusCode, ShouldEqual, http.StatusOK)
 }
 
-func getTestStatuses(server *httptest.Server) []build.Status {
-	resp, err := server.Client().Get(server.URL + endpointEnvsStatus) //nolint:noctx
+func getTestStatuses(testServer *httptest.Server) []build.Status {
+	resp, err := testServer.Client().Get(testServer.URL + endpointEnvsStatus) //nolint:noctx
 	So(err, ShouldBeNil)
 	So(resp.StatusCode, ShouldEqual, http.StatusOK)
 

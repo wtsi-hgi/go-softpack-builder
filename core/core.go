@@ -48,6 +48,7 @@ const (
 	ErrNoCoreURL           = "no coreURL specified in config"
 
 	graphQLEndpoint = "/graphql"
+	resendEndpoint  = "/resend-pending-builds"
 )
 
 type gqlVariables struct {
