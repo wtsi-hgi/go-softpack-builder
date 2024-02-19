@@ -55,8 +55,9 @@ func (p Packages) Validate() error {
 	}
 
 	for _, pkg := range p {
-		if pkg.Name == "" {
-			return ErrNoPackageName
+		err := pkg.Validate()
+		if err != nil {
+			return err
 		}
 	}
 
