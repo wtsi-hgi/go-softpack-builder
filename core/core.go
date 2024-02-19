@@ -93,7 +93,7 @@ type Core struct {
 
 // New creates a new Core struct, to contact the core via its configured URL.
 func New(conf *config.Config) (*Core, error) {
-	if conf.CoreURL == "" {
+	if conf == nil || conf.CoreURL == "" {
 		return nil, internal.Error(ErrNoCoreURL)
 	}
 
@@ -151,5 +151,11 @@ func handleCoreResponse(resp *http.Response) error {
 		}
 	}
 
+	return nil
+}
+
+func (c *Core) ResendPendingBuilds() error {
+	// resp, err := testServer.Client().Post(testServer.URL+resendEndpoint, "application/json", //nolint:noctx
+	// 	strings.NewReader(``))
 	return nil
 }

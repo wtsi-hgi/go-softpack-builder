@@ -24,15 +24,14 @@
 package core
 
 import (
+	"fmt"
+	"io"
+	"net/http"
 	"net/http/httptest"
-	"path/filepath"
 	"testing"
 
 	. "github.com/smartystreets/goconvey/convey"
-	"github.com/wtsi-hgi/go-softpack-builder/build"
 	"github.com/wtsi-hgi/go-softpack-builder/config"
-	"github.com/wtsi-hgi/go-softpack-builder/internal/buildermock"
-	"github.com/wtsi-hgi/go-softpack-builder/server"
 )
 
 func TestCore(t *testing.T) {
@@ -66,6 +65,7 @@ func TestCore(t *testing.T) {
 
 		conf, err := config.GetConfig("")
 		if err != nil || conf.CoreURL == "" {
+			fmt.Printf("\nerr: %s\n", err)
 			_, err = New(conf)
 			So(err, ShouldNotBeNil)
 
@@ -99,24 +99,25 @@ func TestCore(t *testing.T) {
 					return
 				}
 
-				mb := new(buildermock.MockBuilder)
+				var body string
 
-				handler := server.New(mb)
+				handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					content, err := io.ReadAll(r.Body)
+					if err != nil {
+						http.Error(w, fmt.Sprintf("read failed: %s", err), http.StatusInternalServerError)
+
+						return
+					}
+
+					body = string(content)
+				})
+
 				testServer := httptest.NewUnstartedServer(handler)
 				testServer.Config.Addr = conf.ListenURL
 				testServer.Start()
 				defer testServer.Close()
 
-				So(mb.Received[0], ShouldResemble, &build.Definition{
-					EnvironmentPath:    filepath.Dir(path),
-					EnvironmentName:    filepath.Base(path),
-					EnvironmentVersion: "1",
-					Description:        desc,
-					Packages:           pkgs,
-				})
-
-				// resp, err := testServer.Client().Post(testServer.URL+resendEndpoint, "application/json", //nolint:noctx
-				// 	strings.NewReader(``))
+				So(body, ShouldEqual, "foo")
 			})
 		})
 

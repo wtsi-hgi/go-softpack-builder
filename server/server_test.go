@@ -168,7 +168,6 @@ func TestServerReal(t *testing.T) {
 		msc := httptest.NewServer(mc)
 
 		gm, _ := gitmock.New()
-
 		gmhttp := httptest.NewServer(gm)
 
 		var conf config.Config
@@ -212,6 +211,34 @@ func TestServerReal(t *testing.T) {
 			statuses = getTestStatuses(server)
 			So(*statuses[0].BuildDone, ShouldHappenAfter, buildStart)
 		})
+
+		// TODO: integration test with real server and core and mock builder
+		// Convey("you can retrigger queued builds", func() {
+		// 	err := core.ResendPendingBuilds()
+		// 	So(err, ShouldBeNil)
+
+		// 	if conf.ListenURL == "" {
+		// 		SkipConvey("Skipping resend tests; set ListenURL in config file")
+
+		// 		return
+		// 	}
+
+		// 	mb := new(buildermock.MockBuilder)
+
+		// 	handler := server.New(mb)
+		// 	testServer := httptest.NewUnstartedServer(handler)
+		// 	testServer.Config.Addr = conf.ListenURL
+		// 	testServer.Start()
+		// 	defer testServer.Close()
+
+		// 	So(mb.Received[0], ShouldResemble, &build.Definition{
+		// 		EnvironmentPath:    filepath.Dir(path),
+		// 		EnvironmentName:    filepath.Base(path),
+		// 		EnvironmentVersion: "1",
+		// 		Description:        desc,
+		// 		Packages:           pkgs,
+		// 	})
+		// })
 	})
 }
 
