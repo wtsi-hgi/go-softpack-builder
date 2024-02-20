@@ -54,5 +54,5 @@ func newCreateMutation(path, description string, packages Packages) *gqlQuery {
 func (c *Core) Create(path, desc string, pkgs Packages) error {
 	gq := newCreateMutation(path, desc, pkgs)
 
-	return c.doCoreRequest(toJSON(gq))
+	return c.doGQLCoreRequest(toJSON(gq))
 }

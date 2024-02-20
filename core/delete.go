@@ -55,5 +55,5 @@ func newDeleteMutation(path string) *gqlQuery {
 func (c *Core) Delete(path string) error {
 	gq := newDeleteMutation(path)
 
-	return c.doCoreRequest(toJSON(gq))
+	return c.doGQLCoreRequest(toJSON(gq))
 }

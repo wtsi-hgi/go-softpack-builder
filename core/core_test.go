@@ -24,7 +24,7 @@
 package core
 
 import (
-	"fmt"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -63,8 +63,7 @@ func TestCore(t *testing.T) {
 		})
 
 		conf, err := config.GetConfig("")
-		if err != nil || conf.CoreURL == "" {
-			fmt.Printf("\nerr: %s\n", err)
+		if err != nil || conf.CoreURL == "" || conf.ListenURL == "" {
 			_, err = New(conf)
 			So(err, ShouldNotBeNil)
 
@@ -76,55 +75,42 @@ func TestCore(t *testing.T) {
 		core, err := New(conf)
 		So(err, ShouldBeNil)
 
-		buildHandler := http.HandlerFunc(func(http.ResponseWriter, *http.Request) {})
+		var buildRequests int
+
+		buildHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			buildRequests++
+		})
+
 		fakeBuildServer := httptest.NewUnstartedServer(buildHandler)
-		fakeBuildServer.Config.Addr = conf.ListenURL
+		l, err := net.Listen("tcp", conf.ListenURL)
+		So(err, ShouldBeNil)
+		fakeBuildServer.Listener.Close()
+		fakeBuildServer.Listener = l
 		fakeBuildServer.Start()
 		defer fakeBuildServer.Close()
 
 		Convey("You can create an environment", func() {
-			// err = core.Delete(path + "-1")
-			// So(err, ShouldBeNil)
+			So(buildRequests, ShouldEqual, 0)
 			err = core.Create(path, desc, pkgs)
 			So(err, ShouldBeNil)
+			So(buildRequests, ShouldEqual, 1)
+
+			repoPath := path + "-1"
+
+			defer core.Delete(repoPath) //nolint:errcheck
 
 			Convey("Then remove it", func() {
-				err = core.Delete(path + "-1")
+				err = core.Delete(repoPath)
 				So(err, ShouldBeNil)
 
-				err = core.Delete(path + "-1")
+				err = core.Delete(repoPath)
 				So(err, ShouldNotBeNil)
 			})
 
 			Convey("Then retrigger its creation", func() {
 				err = core.ResendPendingBuilds()
 				So(err, ShouldBeNil)
-
-				// if conf.ListenURL == "" {
-				// 	SkipConvey("Skipping resend tests; set ListenURL in config file")
-
-				// 	return
-				// }
-
-				// var body string
-
-				// coreHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				// 	content, err := io.ReadAll(r.Body)
-				// 	if err != nil {
-				// 		http.Error(w, fmt.Sprintf("read failed: %s", err), http.StatusInternalServerError)
-
-				// 		return
-				// 	}
-
-				// 	body = string(content)
-				// })
-
-				// testServer := httptest.NewUnstartedServer(coreHandler)
-				// testServer.Config.Addr = conf.ListenURL
-				// testServer.Start()
-				// defer testServer.Close()
-
-				// So(body, ShouldEqual, "foo")
+				So(buildRequests, ShouldBeGreaterThan, 1)
 			})
 		})
 

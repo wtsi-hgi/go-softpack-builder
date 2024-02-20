@@ -98,7 +98,7 @@ func New(conf *config.Config) (*Core, error) {
 	}
 
 	return &Core{
-		url: strings.TrimSuffix(conf.CoreURL, "/") + graphQLEndpoint,
+		url: strings.TrimSuffix(conf.CoreURL, "/"),
 	}, nil
 }
 
@@ -110,28 +110,32 @@ func toJSON(thing any) io.Reader {
 	return &buf
 }
 
-func (c *Core) doCoreRequest(graphQLPacket io.Reader) error {
+func (c *Core) doGQLCoreRequest(graphQLPacket io.Reader) error {
+	resp, err := c.doCoreRequest(graphQLEndpoint, graphQLPacket)
+	if err != nil {
+		return err
+	}
+
+	return handleGQLCoreResponse(resp)
+}
+
+func (c *Core) doCoreRequest(endpoint string, content io.Reader) (*http.Response, error) {
 	req, err := http.NewRequestWithContext(
 		context.Background(),
 		http.MethodPost,
-		c.url,
-		graphQLPacket,
+		c.url+endpoint,
+		content,
 	)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	req.Header.Add("Content-Type", "application/json")
 
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return err
-	}
-
-	return handleCoreResponse(resp)
+	return http.DefaultClient.Do(req)
 }
 
-func handleCoreResponse(resp *http.Response) error {
+func handleGQLCoreResponse(resp *http.Response) error {
 	var cr Response
 
 	err := json.NewDecoder(resp.Body).Decode(&cr)
@@ -155,7 +159,7 @@ func handleCoreResponse(resp *http.Response) error {
 }
 
 func (c *Core) ResendPendingBuilds() error {
-	// resp, err := testServer.Client().Post(testServer.URL+resendEndpoint, "application/json", //nolint:noctx
-	// 	strings.NewReader(``))
-	return nil
+	_, err := c.doCoreRequest(resendEndpoint, strings.NewReader(""))
+
+	return err
 }
