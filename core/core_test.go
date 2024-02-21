@@ -110,7 +110,16 @@ func TestCore(t *testing.T) {
 			Convey("Then retrigger its creation", func() {
 				err = core.ResendPendingBuilds()
 				So(err, ShouldBeNil)
-				So(buildRequests, ShouldBeGreaterThan, 1)
+				postRetriggerBuildRequests := buildRequests
+				So(postRetriggerBuildRequests, ShouldBeGreaterThan, 1)
+
+				Convey("Unless the builder is down", func() {
+					fakeBuildServer.Close()
+					err = core.ResendPendingBuilds()
+					So(err, ShouldNotBeNil)
+					So(err.Error(), ShouldEqual, ErrSomeResendsFailed)
+					So(buildRequests, ShouldEqual, postRetriggerBuildRequests)
+				})
 			})
 		})
 

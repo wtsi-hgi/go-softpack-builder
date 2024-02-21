@@ -35,7 +35,7 @@ type MockBuilder struct {
 	Requested []time.Time
 }
 
-func (m *MockBuilder) Build(def *build.Definition) error {
+func (m *MockBuilder) Build(def *build.Definition) error { //nolint:unparam
 	m.Received = append(m.Received, def)
 
 	return nil

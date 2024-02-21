@@ -28,6 +28,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -47,11 +48,18 @@ func TestServerMock(t *testing.T) {
 	Convey("Posts to core result in a Definition being sent to Build()", t, func() {
 		mb := new(buildermock.MockBuilder)
 
-		handler := New(mb)
-		testServer := httptest.NewServer(handler)
-		defer testServer.Close()
+		l, err := NewListener("")
+		So(err, ShouldBeNil)
+		addr := "http://" + l.Addr().String()
 
-		postToBuildEndpoint(testServer, "users/user/myenv", "0.8.1")
+		s, err := New(mb, &config.Config{})
+		So(err, ShouldBeNil)
+		defer s.Stop()
+		go func() {
+			s.Start(l) //nolint:errcheck
+		}()
+
+		postToBuildEndpoint(addr, "users/user/myenv", "0.8.1")
 
 		So(mb.Received[0], ShouldResemble, &build.Definition{
 			EnvironmentPath:    "users/user/",
@@ -118,7 +126,7 @@ func TestServerMock(t *testing.T) {
 					OutputError: "error validating request: package names required\n",
 				},
 			} {
-				resp, err := testServer.Client().Post(testServer.URL+endpointEnvsBuild, "application/json", //nolint:noctx
+				resp, err := http.Post(addr+endpointEnvsBuild, "application/json", //nolint:noctx
 					strings.NewReader(test.InputJSON))
 
 				So(err, ShouldBeNil)
@@ -131,7 +139,7 @@ func TestServerMock(t *testing.T) {
 
 		Convey("After which you can get the queued/building/built status for it", func() {
 			mb.Requested = append(mb.Requested, time.Now())
-			resp, err := testServer.Client().Get(testServer.URL + endpointEnvsStatus) //nolint:noctx
+			resp, err := http.Get(addr + endpointEnvsStatus) //nolint:noctx
 			So(err, ShouldBeNil)
 			So(resp.StatusCode, ShouldEqual, http.StatusOK)
 			var statuses []build.Status
@@ -141,11 +149,11 @@ func TestServerMock(t *testing.T) {
 			So(statuses[0].Name, ShouldEqual, "users/user/myenv-0.8.1")
 			So(*statuses[0].Requested, ShouldHappenWithin, 0*time.Microsecond, mb.Requested[0])
 
-			postToBuildEndpoint(testServer, "users/user/myotherenv", "1")
+			postToBuildEndpoint(addr, "users/user/myotherenv", "1")
 
 			mb.Requested = append(mb.Requested, time.Now())
 
-			resp, err = testServer.Client().Get(testServer.URL + endpointEnvsStatus) //nolint:noctx
+			resp, err = http.Get(addr + endpointEnvsStatus) //nolint:noctx
 			So(err, ShouldBeNil)
 			So(resp.StatusCode, ShouldEqual, http.StatusOK)
 			statuses = []build.Status{}
@@ -164,7 +172,7 @@ func TestServerReal(t *testing.T) {
 		ms3 := &s3mock.MockS3{}
 		mockStatusPollInterval := 1 * time.Millisecond
 		mwr := wrmock.NewMockWR(mockStatusPollInterval, 10*time.Millisecond)
-		mc := &coremock.MockCore{Files: make(map[string]string)}
+		mc := coremock.NewMockCore()
 		msc := httptest.NewServer(mc)
 
 		gm, _ := gitmock.New()
@@ -182,15 +190,23 @@ func TestServerReal(t *testing.T) {
 		builder, err := build.New(&conf, ms3, mwr)
 		So(err, ShouldBeNil)
 
-		handler := New(builder)
-		server := httptest.NewServer(handler)
-		So(server != nil, ShouldBeTrue)
+		l, err := NewListener("")
+		So(err, ShouldBeNil)
+		addr := "http://" + l.Addr().String()
+
+		s, err := New(builder, &config.Config{})
+		So(err, ShouldBeNil)
+		defer s.Stop()
+
+		go func() {
+			s.Start(l) //nolint:errcheck
+		}()
 
 		buildSubmitted := time.Now()
-		postToBuildEndpoint(server, "users/user/myenv", "0.8.1")
+		postToBuildEndpoint(addr, "users/user/myenv", "0.8.1")
 
 		Convey("you get a real status", func() {
-			statuses := getTestStatuses(server)
+			statuses := getTestStatuses(addr)
 			So(len(statuses), ShouldEqual, 1)
 			So(statuses[0].Name, ShouldEqual, "users/user/myenv-0.8.1")
 			So(*statuses[0].Requested, ShouldHappenAfter, buildSubmitted)
@@ -200,7 +216,7 @@ func TestServerReal(t *testing.T) {
 			runT := time.Now()
 			mwr.SetRunning()
 			<-time.After(2 * mockStatusPollInterval)
-			statuses = getTestStatuses(server)
+			statuses = getTestStatuses(addr)
 			So(len(statuses), ShouldEqual, 1)
 			So(*statuses[0].Requested, ShouldHappenAfter, buildSubmitted)
 			buildStart := *statuses[0].BuildStart
@@ -208,42 +224,75 @@ func TestServerReal(t *testing.T) {
 			So(statuses[0].BuildDone, ShouldBeNil)
 
 			<-time.After(mwr.JobDuration)
-			statuses = getTestStatuses(server)
+			statuses = getTestStatuses(addr)
 			So(*statuses[0].BuildDone, ShouldHappenAfter, buildStart)
 		})
 
-		// TODO: integration test with real server and core and mock builder
-		// Convey("you can retrigger queued builds", func() {
-		// 	err := core.ResendPendingBuilds()
-		// 	So(err, ShouldBeNil)
+		Convey("you can retrigger queued builds", func() {
+			conf, err := config.GetConfig("")
+			if err != nil || conf.CoreURL == "" || conf.ListenURL == "" {
+				SkipConvey("Skipping further tests; set CoreURL and ListenURL in config file", func() {})
 
-		// 	if conf.ListenURL == "" {
-		// 		SkipConvey("Skipping resend tests; set ListenURL in config file")
+				return
+			}
 
-		// 		return
-		// 	}
+			c, err := core.New(conf)
+			So(err, ShouldBeNil)
 
-		// 	mb := new(buildermock.MockBuilder)
+			path := "users/foo/env"
+			desc := "a desc"
+			pkgs := core.Packages{
+				{
+					Name:    "pckA",
+					Version: "1",
+				},
+				{
 
-		// 	handler := server.New(mb)
-		// 	testServer := httptest.NewUnstartedServer(handler)
-		// 	testServer.Config.Addr = conf.ListenURL
-		// 	testServer.Start()
-		// 	defer testServer.Close()
+					Name:    "pckB",
+					Version: "2",
+				},
+			}
+			err = c.Create(path, desc, pkgs)
+			So(err, ShouldNotBeNil)
+			defer c.Delete(path + "-1") //nolint:errcheck
 
-		// 	So(mb.Received[0], ShouldResemble, &build.Definition{
-		// 		EnvironmentPath:    filepath.Dir(path),
-		// 		EnvironmentName:    filepath.Base(path),
-		// 		EnvironmentVersion: "1",
-		// 		Description:        desc,
-		// 		Packages:           pkgs,
-		// 	})
-		// })
+			mb := new(buildermock.MockBuilder)
+			So(len(mb.Received), ShouldEqual, 0)
+
+			l, err = NewListener(conf.ListenURL)
+			So(err, ShouldBeNil)
+
+			s, err := New(mb, conf)
+			So(err, ShouldBeNil)
+
+			errCh := make(chan error)
+
+			go func() {
+				defer s.Stop()
+				errCh <- s.Start(l)
+			}()
+
+			<-time.After(100 * time.Millisecond)
+			// TODO: since we're using a real core, we get rebuilds for any and
+			// all pending environments that happen to be in the repo
+			// (if we wait long enough for them to arrive)
+			So(len(mb.Received), ShouldEqual, 1)
+			So(mb.Received[0], ShouldResemble, &build.Definition{
+				EnvironmentPath:    filepath.Dir(path),
+				EnvironmentName:    filepath.Base(path),
+				EnvironmentVersion: "1",
+				Description:        desc,
+				Packages:           pkgs,
+			})
+
+			s.Stop()
+			So(<-errCh, ShouldBeNil)
+		})
 	})
 }
 
-func postToBuildEndpoint(testServer *httptest.Server, name, version string) {
-	resp, err := testServer.Client().Post(testServer.URL+endpointEnvsBuild, "application/json", //nolint:noctx
+func postToBuildEndpoint(serverURL, name, version string) {
+	resp, err := http.Post(serverURL+endpointEnvsBuild, "application/json", //nolint:noctx
 		strings.NewReader(`
 {
 	"name": "`+name+`",
@@ -259,8 +308,8 @@ func postToBuildEndpoint(testServer *httptest.Server, name, version string) {
 	So(resp.StatusCode, ShouldEqual, http.StatusOK)
 }
 
-func getTestStatuses(testServer *httptest.Server) []build.Status {
-	resp, err := testServer.Client().Get(testServer.URL + endpointEnvsStatus) //nolint:noctx
+func getTestStatuses(serverURL string) []build.Status {
+	resp, err := http.Get(serverURL + endpointEnvsStatus) //nolint:noctx
 	So(err, ShouldBeNil)
 	So(resp.StatusCode, ShouldEqual, http.StatusOK)
 

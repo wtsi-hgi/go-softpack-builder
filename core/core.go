@@ -46,6 +46,7 @@ const (
 	UsageBasename          = "README.md"
 	ImageBasename          = "singularity.sif"
 	ErrNoCoreURL           = "no coreURL specified in config"
+	ErrSomeResendsFailed   = "some queued environments failed to be resent from core to builder"
 
 	graphQLEndpoint = "/graphql"
 	resendEndpoint  = "/resend-pending-builds"
@@ -158,8 +159,32 @@ func handleGQLCoreResponse(resp *http.Response) error {
 	return nil
 }
 
-func (c *Core) ResendPendingBuilds() error {
-	_, err := c.doCoreRequest(resendEndpoint, strings.NewReader(""))
+type ResendResponse struct {
+	Message   string
+	Successes int
+	Failures  int
+}
 
-	return err
+func (rr *ResendResponse) FullSuccess() bool {
+	return rr.Failures == 0
+}
+
+func (c *Core) ResendPendingBuilds() error {
+	resp, err := c.doCoreRequest(resendEndpoint, strings.NewReader(""))
+	if err != nil {
+		return err
+	}
+
+	var rr ResendResponse
+
+	err = json.NewDecoder(resp.Body).Decode(&rr)
+	if err != nil {
+		return err
+	}
+
+	if !rr.FullSuccess() {
+		return internal.Error(ErrSomeResendsFailed)
+	}
+
+	return nil
 }

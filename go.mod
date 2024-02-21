@@ -9,6 +9,7 @@ require (
 	github.com/smartystreets/goconvey v1.8.1
 	github.com/spf13/cobra v1.7.0
 	golang.org/x/sys v0.6.0
+	gopkg.in/tylerb/graceful.v1 v1.2.15
 	gopkg.in/yaml.v3 v3.0.1
 )
 

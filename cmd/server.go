@@ -25,7 +25,6 @@ package cmd
 
 import (
 	"log/slog"
-	"net/http"
 	"os"
 
 	"github.com/spf13/cobra"
@@ -141,13 +140,16 @@ past reindexHours, and only if a reindex is not still ongoing.
 			die("could not create a builder: %s", err)
 		}
 
-		s := reindex.NewScheduler(conf, b)
-		s.Start()
+		sch := reindex.NewScheduler(conf, b)
+		sch.Start()
+		defer sch.Stop()
+
+		s := server.New(b)
 		defer s.Stop()
 
-		err = http.ListenAndServe(conf.ListenURL, server.New(b)) //nolint:gosec
+		err = s.Start(conf.ListenURL)
 		if err != nil {
-			die("could not start server: %s", err)
+			die("non-graceful stop: %s", err)
 		}
 	},
 }

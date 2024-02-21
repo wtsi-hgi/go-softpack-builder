@@ -115,7 +115,7 @@ func TestWR(t *testing.T) {
 		})
 	})
 
-	Convey("You can clean up running jobs", t, func() {
+	Convey("You can recover running jobs", t, func() {
 		// TODO
 	})
 

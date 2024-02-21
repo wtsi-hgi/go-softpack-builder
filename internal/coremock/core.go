@@ -39,6 +39,12 @@ type MockCore struct {
 	Files map[string]string
 }
 
+func NewMockCore() *MockCore {
+	return &MockCore{
+		Files: make(map[string]string),
+	}
+}
+
 func (m *MockCore) setFile(filename, contents string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()

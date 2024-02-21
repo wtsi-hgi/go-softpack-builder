@@ -61,7 +61,7 @@ Allows manual builds without a softpack client.`,
 		pkgs := getPackageList(buildPackagesPath)
 		err = c.Create(path, desc, pkgs)
 		if err != nil {
-			die("failed to create environment: %s", err)
+			die("failed to create environment (but it might be queued for later): %s", err)
 		}
 
 		info("environment build successfully scheduled")

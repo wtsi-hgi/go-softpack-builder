@@ -26,17 +26,23 @@ package server
 import (
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
 	"path"
+	"time"
 
 	"github.com/wtsi-hgi/go-softpack-builder/build"
+	"github.com/wtsi-hgi/go-softpack-builder/config"
 	"github.com/wtsi-hgi/go-softpack-builder/core"
+	"gopkg.in/tylerb/graceful.v1"
 )
 
 const (
 	endpointEnvs       = "/environments"
 	endpointEnvsBuild  = endpointEnvs + "/build"
 	endpointEnvsStatus = endpointEnvs + "/status"
+	stopTimeout        = 10 * time.Second
+	readHeaderTimeout  = 20 * time.Second
 )
 
 type Error string
@@ -63,24 +69,82 @@ type Request struct {
 	}
 }
 
+type Server struct {
+	b   Builder
+	srv *graceful.Server
+	c   *core.Core
+}
+
 // New takes a Builder that will be sent a Definition when the returned Handler
 // receives request JSON POSTed to /environments/build, and uses the Builder to
 // get status information for builds when it receives a GET request to
-// /environments/status.
-func New(b Builder) http.Handler {
-	// TODO: change things so we return a Server that has a ListenAndServe that
-	// would call core.ResendBuildRequests after we're listening
+// /environments/status. It uses the config to get your core URL, and if set
+// will trigger the core service to resend pending builds to us after Start().
+func New(b Builder, c *config.Config) (*Server, error) {
+	s := &Server{
+		b: b,
+	}
 
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	cor, err := core.New(c)
+	if err == nil {
+		s.c = cor
+	}
+
+	return s, nil
+}
+
+// Start starts a server using the given listener (you can get one from
+// NewListener()). Blocks until Stop() is called, or a kill signal is received.
+func (s *Server) Start(l net.Listener) error {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case endpointEnvsBuild:
-			handleEnvBuild(b, w, r)
+			handleEnvBuild(s.b, w, r)
 		case endpointEnvsStatus:
-			handleEnvStatus(b, w)
+			handleEnvStatus(s.b, w)
 		default:
 			http.Error(w, fmt.Sprintf("go-softpack-builder: no such endpoint: %s", r.URL.Path), http.StatusNotFound)
 		}
 	})
+
+	s.srv = &graceful.Server{
+		Timeout: stopTimeout,
+
+		Server: &http.Server{
+			Handler:           handler,
+			ReadHeaderTimeout: readHeaderTimeout,
+		},
+	}
+
+	errCh := make(chan error, 1)
+
+	go func() {
+		errCh <- s.srv.Serve(l)
+	}()
+
+	// <-time.After(10 * time.Millisecond)
+
+	if s.c != nil {
+		err := s.c.ResendPendingBuilds()
+		if err != nil {
+			s.Stop()
+
+			return err
+		}
+	}
+
+	return <-errCh
+}
+
+// NewListener returns a listener that listens on the given URL. If blank,
+// listens on a random localhost port. You can use l.Addr().String() to get the
+// address.
+func NewListener(listenURL string) (net.Listener, error) {
+	if listenURL == "" {
+		listenURL = "127.0.0.1:0"
+	}
+
+	return net.Listen("tcp", listenURL)
 }
 
 func handleEnvBuild(b Builder, w http.ResponseWriter, r *http.Request) {
@@ -112,4 +176,8 @@ func handleEnvStatus(b Builder, w http.ResponseWriter) {
 	if err != nil {
 		http.Error(w, fmt.Sprintf("error serialising status: %s", err), http.StatusInternalServerError)
 	}
+}
+
+func (s *Server) Stop() {
+	s.srv.Stop(stopTimeout)
 }
