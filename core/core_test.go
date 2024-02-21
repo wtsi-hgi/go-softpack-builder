@@ -67,7 +67,7 @@ func TestCore(t *testing.T) {
 			_, err = New(conf)
 			So(err, ShouldNotBeNil)
 
-			SkipConvey("Skipping further tests; set CoreURL in config file", func() {})
+			SkipConvey("Skipping further tests; set CoreURL and ListenURL in config file", func() {})
 
 			return
 		}
