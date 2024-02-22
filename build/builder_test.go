@@ -141,7 +141,11 @@ EOF
 	spack buildcache keys --install --trust
 	spack config add "config:install_tree:padded_length:128"
 	spack -e . concretize
-	spack -e . install --fail-fast || {
+	if bash -c "type -P xvfb-run" > /dev/null; then
+		xvfb-run -a spack -e . install --fail-fast
+	else
+		spack -e . install --fail-fast
+	fi || {
 		spack -e . buildcache push -a s3cache
 		false
 	}
