@@ -261,12 +261,3 @@ func statusStringToType(status string) WRJobStatus { //nolint:gocyclo
 		return WRJobStatusInvalid
 	}
 }
-
-// Cleanup removes "incomplete, non-running jobs" from the queue.
-func (r *Runner) Cleanup() error {
-	cmd := exec.Command("wr", "remove", "--deployment", r.deployment, "-a") //nolint:gosec
-
-	_, err := r.runWRCmd(cmd)
-
-	return err
-}

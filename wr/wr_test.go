@@ -105,14 +105,6 @@ func TestWR(t *testing.T) {
 		status, err = runner.Wait(jobID)
 		So(err, ShouldBeNil)
 		So(status, ShouldEqual, WRJobStatusBuried)
-
-		Convey("You can clean up buried jobs", func() {
-			err = runner.Cleanup()
-			So(err, ShouldBeNil)
-
-			statusOut := getWRStatus(runner.deployment, repGrp)
-			So(statusOut, ShouldEqual, "[]\n\n")
-		})
 	})
 
 	Convey("You can recover running jobs", t, func() {
