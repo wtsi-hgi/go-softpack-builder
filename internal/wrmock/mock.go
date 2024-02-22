@@ -74,13 +74,6 @@ func (m *MockWR) SetComplete() {
 	m.ReturnStatus = wr.WRJobStatusComplete
 }
 
-func (m *MockWR) SetBuried() {
-	m.Lock()
-	defer m.Unlock()
-
-	m.ReturnStatus = wr.WRJobStatusBuried
-}
-
 func (m *MockWR) GetLastCmd() string {
 	m.RLock()
 	defer m.RUnlock()
@@ -120,13 +113,4 @@ func (m *MockWR) Status(string) (wr.WRJobStatus, error) { //nolint:unparam
 	defer m.RUnlock()
 
 	return m.ReturnStatus, nil
-}
-
-func (m *MockWR) Cleanup() error { //nolint:unparam
-	m.Lock()
-	defer m.Unlock()
-
-	m.ReturnStatus = wr.WRJobStatusInvalid
-
-	return nil
 }

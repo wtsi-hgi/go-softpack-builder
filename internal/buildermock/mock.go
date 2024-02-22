@@ -31,7 +31,6 @@ import (
 )
 
 type MockBuilder struct {
-	Runner    build.Runner
 	Received  []*build.Definition
 	Requested []time.Time
 }
@@ -57,12 +56,4 @@ func (m *MockBuilder) Status() []build.Status {
 	}
 
 	return statuses
-}
-
-func (m *MockBuilder) Cleanup() error {
-	if m.Runner == nil {
-		return nil
-	}
-
-	return m.Runner.Cleanup()
 }

@@ -42,7 +42,6 @@ import (
 	"github.com/wtsi-hgi/go-softpack-builder/internal/gitmock"
 	"github.com/wtsi-hgi/go-softpack-builder/internal/s3mock"
 	"github.com/wtsi-hgi/go-softpack-builder/internal/wrmock"
-	"github.com/wtsi-hgi/go-softpack-builder/wr"
 )
 
 func TestServerMock(t *testing.T) {
@@ -268,12 +267,6 @@ func TestServerReal(t *testing.T) {
 
 			errCh := make(chan error)
 
-			mb.Runner = mwr
-			mwr.SetBuried()
-			status, err := mwr.Status("")
-			So(err, ShouldBeNil)
-			So(status, ShouldEqual, wr.WRJobStatusBuried)
-
 			go func() {
 				defer s.Stop()
 				errCh <- s.Start(l)
@@ -282,10 +275,6 @@ func TestServerReal(t *testing.T) {
 			ok := s.WaitUntilStarted()
 			So(ok, ShouldBeTrue)
 			So(len(mb.Received), ShouldBeGreaterThanOrEqualTo, 1)
-
-			status, err = mwr.Status("")
-			So(err, ShouldBeNil)
-			So(status, ShouldEqual, wr.WRJobStatusInvalid)
 
 			found := false
 
