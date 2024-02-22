@@ -50,6 +50,9 @@ func NewMockWR(pollForStatusInterval, jobDuration time.Duration) *MockWR {
 
 // Add implements build.Runner interface.
 func (m *MockWR) Add(cmd string) (string, error) { //nolint:unparam
+	m.Lock()
+	defer m.Unlock()
+
 	m.Cmd = cmd
 
 	return "abc123", nil
@@ -69,6 +72,20 @@ func (m *MockWR) SetComplete() {
 	defer m.Unlock()
 
 	m.ReturnStatus = wr.WRJobStatusComplete
+}
+
+func (m *MockWR) SetBuried() {
+	m.Lock()
+	defer m.Unlock()
+
+	m.ReturnStatus = wr.WRJobStatusBuried
+}
+
+func (m *MockWR) GetLastCmd() string {
+	m.RLock()
+	defer m.RUnlock()
+
+	return m.Cmd
 }
 
 // WaitForRunning implements build.Runner interface.

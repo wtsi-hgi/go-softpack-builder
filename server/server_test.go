@@ -269,10 +269,10 @@ func TestServerReal(t *testing.T) {
 			errCh := make(chan error)
 
 			mb.Runner = mwr
-			mwr.SetComplete()
+			mwr.SetBuried()
 			status, err := mwr.Status("")
 			So(err, ShouldBeNil)
-			So(status, ShouldEqual, wr.WRJobStatusComplete)
+			So(status, ShouldEqual, wr.WRJobStatusBuried)
 
 			go func() {
 				defer s.Stop()
