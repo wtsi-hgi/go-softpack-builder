@@ -97,7 +97,7 @@ func TestWR(t *testing.T) {
 		So(err, ShouldBeNil)
 		So(status, ShouldEqual, WRJobStatusComplete)
 
-		runArgs, repGrp = uniqueRunArgs("false", "")
+		runArgs, _ = uniqueRunArgs("false", "")
 		jobID, err = runner.Add(runArgs)
 		So(err, ShouldBeNil)
 		err = runner.WaitForRunning(jobID)
@@ -105,10 +105,6 @@ func TestWR(t *testing.T) {
 		status, err = runner.Wait(jobID)
 		So(err, ShouldBeNil)
 		So(status, ShouldEqual, WRJobStatusBuried)
-	})
-
-	Convey("You can recover running jobs", t, func() {
-		// TODO
 	})
 
 	Convey("WaitForRunning returns when the build starts running", t, func() {

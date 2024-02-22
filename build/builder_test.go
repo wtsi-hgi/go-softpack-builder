@@ -77,7 +77,7 @@ func TestBuilder(t *testing.T) {
 	Convey("Given binary cache and spack repo details and a Definition", t, func() {
 		ms3 := &s3mock.MockS3{}
 		mwr := wrmock.NewMockWR(1*time.Millisecond, 10*time.Millisecond)
-		mc := &coremock.MockCore{Files: make(map[string]string)}
+		mc := coremock.NewMockCore()
 		msc := httptest.NewServer(mc)
 
 		gm, commitHash := gitmock.New()

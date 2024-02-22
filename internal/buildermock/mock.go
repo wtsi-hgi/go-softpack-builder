@@ -30,17 +30,21 @@ import (
 	"github.com/wtsi-hgi/go-softpack-builder/build"
 )
 
+// MockBuilder can be used to test a server.Server without having real builder.
 type MockBuilder struct {
 	Received  []*build.Definition
 	Requested []time.Time
 }
 
+// Build adds the given def to our slice of Received.
 func (m *MockBuilder) Build(def *build.Definition) error { //nolint:unparam
 	m.Received = append(m.Received, def)
 
 	return nil
 }
 
+// Status returns a status for everything sent to Build, assuming you pushed
+// a corresponding timestamp to our Requested slice manually.
 func (m *MockBuilder) Status() []build.Status {
 	statuses := make([]build.Status, 0, len(m.Received))
 

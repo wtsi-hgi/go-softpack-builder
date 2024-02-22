@@ -58,8 +58,7 @@ func (m *MockWR) Add(cmd string) (string, error) { //nolint:unparam
 	return "abc123", nil
 }
 
-// SetRunning should be used before waiting on Ch and if you need to test
-// BuildStart time in Status.
+// SetRunning can be used to mock a job that started running.
 func (m *MockWR) SetRunning() {
 	m.Lock()
 	defer m.Unlock()
@@ -67,6 +66,7 @@ func (m *MockWR) SetRunning() {
 	m.ReturnStatus = wr.WRJobStatusRunning
 }
 
+// SetComplete can be used to mock a job that finished running.
 func (m *MockWR) SetComplete() {
 	m.Lock()
 	defer m.Unlock()
@@ -74,6 +74,7 @@ func (m *MockWR) SetComplete() {
 	m.ReturnStatus = wr.WRJobStatusComplete
 }
 
+// GetLastCmd returns the last cmd Add()ed.
 func (m *MockWR) GetLastCmd() string {
 	m.RLock()
 	defer m.RUnlock()

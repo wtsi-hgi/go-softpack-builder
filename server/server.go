@@ -82,7 +82,7 @@ type Server struct {
 // get status information for builds when it receives a GET request to
 // /environments/status. It uses the config to get your core URL, and if set
 // will trigger the core service to resend pending builds to us after Start().
-func New(b Builder, c *config.Config) (*Server, error) {
+func New(b Builder, c *config.Config) *Server {
 	s := &Server{
 		b: b,
 	}
@@ -93,31 +93,22 @@ func New(b Builder, c *config.Config) (*Server, error) {
 		s.startedCh = make(chan struct{})
 	}
 
-	return s, nil
+	return s
 }
 
 // Start starts a server using the given listener (you can get one from
 // NewListener()). Blocks until Stop() is called, or a kill signal is received.
 //
+// You should always defer Stop(), regardless of this returning an error.
+//
 // If we had been configured with core details, core will be asked to resend its
 // queued environments.
 func (s *Server) Start(l net.Listener) error {
-	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch r.URL.Path {
-		case endpointEnvsBuild:
-			handleEnvBuild(s.b, w, r)
-		case endpointEnvsStatus:
-			handleEnvStatus(s.b, w)
-		default:
-			http.Error(w, fmt.Sprintf("go-softpack-builder: no such endpoint: %s", r.URL.Path), http.StatusNotFound)
-		}
-	})
-
 	s.srv = &graceful.Server{
 		Timeout: stopTimeout,
 
 		Server: &http.Server{
-			Handler:           handler,
+			Handler:           s.endpointsHandler(),
 			ReadHeaderTimeout: readHeaderTimeout,
 		},
 	}
@@ -128,18 +119,36 @@ func (s *Server) Start(l net.Listener) error {
 		errCh <- s.srv.Serve(l)
 	}()
 
-	if s.c != nil {
-		err := s.c.ResendPendingBuilds()
-		close(s.startedCh)
-
-		if err != nil {
-			s.Stop()
-
-			return err
-		}
+	err := s.resendPendingBuildsIfCoreConfigured()
+	if err != nil {
+		return err
 	}
 
 	return <-errCh
+}
+
+func (s *Server) endpointsHandler() http.HandlerFunc {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case endpointEnvsBuild:
+			handleEnvBuild(s.b, w, r)
+		case endpointEnvsStatus:
+			handleEnvStatus(s.b, w)
+		default:
+			http.Error(w, fmt.Sprintf("go-softpack-builder: no such endpoint: %s", r.URL.Path), http.StatusNotFound)
+		}
+	})
+}
+
+func (s *Server) resendPendingBuildsIfCoreConfigured() error {
+	if s.c == nil {
+		return nil
+	}
+
+	err := s.c.ResendPendingBuilds()
+	close(s.startedCh)
+
+	return err
 }
 
 // WaitUntilStarted blocks until Start() brings up a listener and the core

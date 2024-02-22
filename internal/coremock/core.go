@@ -33,12 +33,15 @@ import (
 	"sync"
 )
 
+// MockCore can be used to bring up a simplified core-like service that you can
+// upload and get files from.
 type MockCore struct {
 	mu    sync.RWMutex
 	Err   error
 	Files map[string]string
 }
 
+// NewMockCore returns a new MockCore with an empty set of Files.
 func NewMockCore() *MockCore {
 	return &MockCore{
 		Files: make(map[string]string),
@@ -52,6 +55,7 @@ func (m *MockCore) setFile(filename, contents string) {
 	m.Files[filename] = contents
 }
 
+// GetFile thread-safe returns previously uploaded file contents by filename.
 func (m *MockCore) GetFile(filename string) (string, bool) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
@@ -61,6 +65,7 @@ func (m *MockCore) GetFile(filename string) (string, bool) {
 	return contents, ok
 }
 
+// ServeHTTP is to implement http.Handler so you can httptest.NewServer(m).
 func (m *MockCore) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if m.Err != nil {
 		http.Error(w, m.Err.Error(), http.StatusInternalServerError)

@@ -7,6 +7,8 @@ import (
 	"io"
 	"math/rand"
 	"net/http"
+
+	"github.com/wtsi-hgi/go-softpack-builder/internal"
 )
 
 const (
@@ -21,22 +23,20 @@ const (
 	hashLen   = 40
 )
 
-type Error string
-
-func (e Error) Error() string {
-	return string(e)
-}
-
 const (
-	ErrNotFound = Error("not found")
+	ErrNotFound = internal.Error("not found")
 )
 
+// MockGit can be used to start a pretend git server for testing custom spack
+// repos.
 type MockGit struct {
 	refs       map[string]string
 	masterName string
 	Smart      bool
 }
 
+// New returns a new MockGit that provides a git repo with a random number of
+// random refs.
 func New() (*MockGit, string) {
 	numRefs := rand.Intn(numRefGen) + numRefGen //nolint:gosec
 
@@ -64,6 +64,7 @@ func New() (*MockGit, string) {
 	}, masterCommit
 }
 
+// ServeHTTP is to implement http.Handler so you can httptest.NewServer(m).
 func (m *MockGit) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if err := m.handle(w, r.URL.Path); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)

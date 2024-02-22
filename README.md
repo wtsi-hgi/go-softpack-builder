@@ -43,6 +43,14 @@ desired environment details, this service does the following:
    It can be reproduced exactly at any time using the singularity.def, assuming
    you configure specific images (ie. not :latest) to use.
 
+When this service starts, it triggers core to re-send "queued" environments:
+those that exist in the artifacts repo as just a definition but with no other
+build artifacts.
+
+If this service is restarted while a build is running, core's re-send will
+result in the running build completing normally, followed by the rest of the
+above 7 steps. Buried builds will remain buried.
+
 After receiving a GET to `/environments/status`, this service returns a JSON
 response with the following structure:
 

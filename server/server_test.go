@@ -52,8 +52,7 @@ func TestServerMock(t *testing.T) {
 		So(err, ShouldBeNil)
 		addr := "http://" + l.Addr().String()
 
-		s, err := New(mb, &config.Config{})
-		So(err, ShouldBeNil)
+		s := New(mb, &config.Config{})
 		defer s.Stop()
 		go func() {
 			s.Start(l) //nolint:errcheck
@@ -194,8 +193,7 @@ func TestServerReal(t *testing.T) {
 		So(err, ShouldBeNil)
 		addr := "http://" + l.Addr().String()
 
-		s, err := New(builder, &config.Config{})
-		So(err, ShouldBeNil)
+		s := New(builder, &config.Config{})
 		defer s.Stop()
 
 		go func() {
@@ -262,9 +260,7 @@ func TestServerReal(t *testing.T) {
 			l, err = NewListener(conf.ListenURL)
 			So(err, ShouldBeNil)
 
-			s, err := New(mb, conf)
-			So(err, ShouldBeNil)
-
+			s := New(mb, conf)
 			errCh := make(chan error)
 
 			go func() {
