@@ -38,11 +38,12 @@ import (
 )
 
 const (
-	endpointEnvs       = "/environments"
-	endpointEnvsBuild  = endpointEnvs + "/build"
-	endpointEnvsStatus = endpointEnvs + "/status"
-	stopTimeout        = 10 * time.Second
-	readHeaderTimeout  = 20 * time.Second
+	endpointEnvs            = "/environments"
+	endpointEnvsBuild       = endpointEnvs + "/build"
+	endpointEnvsStatus      = endpointEnvs + "/status"
+	stopTimeout             = 10 * time.Second
+	readHeaderTimeout       = 20 * time.Second
+	waitUntilStartedTimeout = 10 * time.Second
 )
 
 type Error string
@@ -70,9 +71,10 @@ type Request struct {
 }
 
 type Server struct {
-	b   Builder
-	srv *graceful.Server
-	c   *core.Core
+	b         Builder
+	srv       *graceful.Server
+	c         *core.Core
+	startedCh chan struct{}
 }
 
 // New takes a Builder that will be sent a Definition when the returned Handler
@@ -88,6 +90,7 @@ func New(b Builder, c *config.Config) (*Server, error) {
 	cor, err := core.New(c)
 	if err == nil {
 		s.c = cor
+		s.startedCh = make(chan struct{})
 	}
 
 	return s, nil
@@ -122,10 +125,10 @@ func (s *Server) Start(l net.Listener) error {
 		errCh <- s.srv.Serve(l)
 	}()
 
-	// <-time.After(10 * time.Millisecond)
-
 	if s.c != nil {
 		err := s.c.ResendPendingBuilds()
+		close(s.startedCh)
+
 		if err != nil {
 			s.Stop()
 
@@ -134,6 +137,25 @@ func (s *Server) Start(l net.Listener) error {
 	}
 
 	return <-errCh
+}
+
+// WaitUntilStarted blocks until Start() brings up a listener and the core
+// service talk to us. Will only work if we were configured with core details
+// and the core is working. There is a timeout; will return false if the timeout
+// expires, or core details weren't configured.
+func (s *Server) WaitUntilStarted() bool {
+	if s.startedCh == nil {
+		return false
+	}
+
+	timeout := time.NewTimer(waitUntilStartedTimeout)
+
+	select {
+	case <-s.startedCh:
+		return true
+	case <-timeout.C:
+		return false
+	}
 }
 
 // NewListener returns a listener that listens on the given URL. If blank,

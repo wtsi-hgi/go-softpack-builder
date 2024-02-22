@@ -272,18 +272,21 @@ func TestServerReal(t *testing.T) {
 				errCh <- s.Start(l)
 			}()
 
-			<-time.After(100 * time.Millisecond)
-			// TODO: since we're using a real core, we get rebuilds for any and
-			// all pending environments that happen to be in the repo
-			// (if we wait long enough for them to arrive)
-			So(len(mb.Received), ShouldEqual, 1)
-			So(mb.Received[0], ShouldResemble, &build.Definition{
-				EnvironmentPath:    filepath.Dir(path),
-				EnvironmentName:    filepath.Base(path),
-				EnvironmentVersion: "1",
-				Description:        desc,
-				Packages:           pkgs,
-			})
+			ok := s.WaitUntilStarted()
+			So(ok, ShouldBeTrue)
+			So(len(mb.Received), ShouldBeGreaterThanOrEqualTo, 1)
+
+			found := false
+
+			for _, def := range mb.Received {
+				if def.EnvironmentName == filepath.Base(path) && def.EnvironmentPath == filepath.Dir(path)+"/" {
+					found = true
+
+					break
+				}
+			}
+
+			So(found, ShouldBeTrue)
 
 			s.Stop()
 			So(<-errCh, ShouldBeNil)

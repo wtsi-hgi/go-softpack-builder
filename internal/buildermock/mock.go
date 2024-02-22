@@ -42,13 +42,17 @@ func (m *MockBuilder) Build(def *build.Definition) error { //nolint:unparam
 }
 
 func (m *MockBuilder) Status() []build.Status {
-	statuses := make([]build.Status, len(m.Received))
+	statuses := make([]build.Status, 0, len(m.Received))
 
 	for i, def := range m.Received {
-		statuses[i] = build.Status{
+		if len(m.Requested) <= i {
+			break
+		}
+
+		statuses = append(statuses, build.Status{
 			Name:      filepath.Join(def.EnvironmentPath, def.EnvironmentName) + "-" + def.EnvironmentVersion,
 			Requested: &m.Requested[i],
-		}
+		})
 	}
 
 	return statuses
