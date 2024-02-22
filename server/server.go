@@ -57,6 +57,7 @@ func (e Error) Error() string {
 type Builder interface {
 	Build(*build.Definition) error
 	Status() []build.Status
+	Cleanup() error
 }
 
 // A Request object contains all of the information required to build an
@@ -98,7 +99,17 @@ func New(b Builder, c *config.Config) (*Server, error) {
 
 // Start starts a server using the given listener (you can get one from
 // NewListener()). Blocks until Stop() is called, or a kill signal is received.
+//
+// If we had been configured with core details, core will be asked to resend its
+// queued environments.
+//
+// Any non-running jobs in wr's queue will be cleaned up.
 func (s *Server) Start(l net.Listener) error {
+	err := s.b.Cleanup()
+	if err != nil {
+		return err
+	}
+
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case endpointEnvsBuild:

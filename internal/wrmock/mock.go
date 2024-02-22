@@ -104,3 +104,12 @@ func (m *MockWR) Status(string) (wr.WRJobStatus, error) { //nolint:unparam
 
 	return m.ReturnStatus, nil
 }
+
+func (m *MockWR) Cleanup() error { //nolint:unparam
+	m.Lock()
+	defer m.Unlock()
+
+	m.ReturnStatus = wr.WRJobStatusInvalid
+
+	return nil
+}

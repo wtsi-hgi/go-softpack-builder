@@ -148,6 +148,7 @@ type Runner interface {
 	WaitForRunning(id string) error
 	Wait(id string) (wr.WRJobStatus, error)
 	Status(id string) (wr.WRJobStatus, error)
+	Cleanup() error
 }
 
 // The status of an individual build – when it was requested, when it started
@@ -664,4 +665,9 @@ func sendFormFiles(artifacts map[string]io.Reader, //nolint:misspell
 	}
 
 	return writerInput.Close()
+}
+
+// Cleanup removes non-running jobs from the runner's queue.
+func (b *Builder) Cleanup() error {
+	return b.runner.Cleanup()
 }

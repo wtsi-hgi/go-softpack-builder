@@ -373,6 +373,20 @@ packages:
 			So(data, ShouldContainSubstring, "output")
 
 			So(bcbCount.Load(), ShouldEqual, 1)
+
+			Convey("and you can clean up wr's queue afterwards", func() {
+				mwr.ReturnStatus = wr.WRJobStatusReady
+				status, err := mwr.Status("")
+				So(err, ShouldBeNil)
+				So(status, ShouldEqual, wr.WRJobStatusReady)
+
+				err = builder.Cleanup()
+				So(err, ShouldBeNil)
+
+				status, err = mwr.Status("")
+				So(err, ShouldBeNil)
+				So(status, ShouldEqual, wr.WRJobStatusInvalid)
+			})
 		})
 
 		Convey("You can't run the same build simultaneously", func() {

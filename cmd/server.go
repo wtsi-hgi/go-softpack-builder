@@ -144,10 +144,18 @@ past reindexHours, and only if a reindex is not still ongoing.
 		sch.Start()
 		defer sch.Stop()
 
-		s := server.New(b)
+		s, err := server.New(b, conf)
 		defer s.Stop()
+		if err != nil {
+			die("could not create a server: %s", err)
+		}
 
-		err = s.Start(conf.ListenURL)
+		l, err := server.NewListener(conf.ListenURL)
+		if err != nil {
+			die("could not create listener: %s", err)
+		}
+
+		err = s.Start(l)
 		if err != nil {
 			die("non-graceful stop: %s", err)
 		}
