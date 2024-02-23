@@ -70,7 +70,7 @@ func Remove(conf *config.Config, s3r s3Remover, envPath, version string) error {
 		return err
 	}
 
-	slog.Info(fmt.Sprintf("Removing env %s from core\n", envPath))
+	slog.Info(fmt.Sprintf("removing env %s from core\n", envPath))
 
 	core, err := core.New(conf)
 	if err != nil {
