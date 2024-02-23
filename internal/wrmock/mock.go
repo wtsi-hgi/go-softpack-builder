@@ -41,6 +41,8 @@ type MockWR struct {
 	ReturnStatus wr.WRJobStatus
 }
 
+// NewMockWR returns a new MockWR that will wait pollForStatusInterval during
+// WaitForRunning() and jobDuration during Wait().
 func NewMockWR(pollForStatusInterval, jobDuration time.Duration) *MockWR {
 	return &MockWR{
 		PollForStatusInterval: pollForStatusInterval,

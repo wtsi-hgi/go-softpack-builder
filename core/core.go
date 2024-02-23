@@ -159,16 +159,22 @@ func handleGQLCoreResponse(resp *http.Response) error {
 	return nil
 }
 
+// ResendResponse is the response that the core service sends when a resend
+// request is sent to it.
 type ResendResponse struct {
 	Message   string
 	Successes int
 	Failures  int
 }
 
+// FullSuccess returns true if there were no failures.
 func (rr *ResendResponse) FullSuccess() bool {
 	return rr.Failures == 0
 }
 
+// ResendPendingBuilds posts to core's resend-pending-builds endpoint and
+// returns an error if the post failed, or core did not respond with a full
+// success.
 func (c *Core) ResendPendingBuilds() error {
 	resp, err := c.doCoreRequest(resendEndpoint, strings.NewReader(""))
 	if err != nil {
