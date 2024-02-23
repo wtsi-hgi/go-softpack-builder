@@ -36,50 +36,36 @@ import (
 	. "github.com/smartystreets/goconvey/convey"
 	"github.com/wtsi-hgi/go-softpack-builder/build"
 	"github.com/wtsi-hgi/go-softpack-builder/config"
-	"github.com/wtsi-hgi/go-softpack-builder/internal"
-	"github.com/wtsi-hgi/go-softpack-builder/internal/core"
+	"github.com/wtsi-hgi/go-softpack-builder/core"
+	"github.com/wtsi-hgi/go-softpack-builder/internal/buildermock"
+	"github.com/wtsi-hgi/go-softpack-builder/internal/coremock"
 	"github.com/wtsi-hgi/go-softpack-builder/internal/gitmock"
+	"github.com/wtsi-hgi/go-softpack-builder/internal/s3mock"
+	"github.com/wtsi-hgi/go-softpack-builder/internal/wrmock"
 )
-
-type mockBuilder struct {
-	received  []*build.Definition
-	requested []time.Time
-}
-
-func (m *mockBuilder) Build(def *build.Definition) error {
-	m.received = append(m.received, def)
-
-	return nil
-}
-
-func (m *mockBuilder) Status() []build.Status {
-	statuses := make([]build.Status, len(m.received))
-
-	for i, def := range m.received {
-		statuses[i] = build.Status{
-			Name:      filepath.Join(def.EnvironmentPath, def.EnvironmentName) + "-" + def.EnvironmentVersion,
-			Requested: &m.requested[i],
-		}
-	}
-
-	return statuses
-}
 
 func TestServerMock(t *testing.T) {
 	Convey("Posts to core result in a Definition being sent to Build()", t, func() {
-		mb := new(mockBuilder)
+		mb := new(buildermock.MockBuilder)
 
-		handler := New(mb)
-		server := httptest.NewServer(handler)
+		l, err := NewListener("")
+		So(err, ShouldBeNil)
+		addr := "http://" + l.Addr().String()
 
-		postToBuildEndpoint(server, "users/user/myenv", "0.8.1")
+		s := New(mb, &config.Config{})
+		defer s.Stop()
+		go func() {
+			s.Start(l) //nolint:errcheck
+		}()
 
-		So(mb.received[0], ShouldResemble, &build.Definition{
+		postToBuildEndpoint(addr, "users/user/myenv", "0.8.1")
+
+		So(mb.Received[0], ShouldResemble, &build.Definition{
 			EnvironmentPath:    "users/user/",
 			EnvironmentName:    "myenv",
 			EnvironmentVersion: "0.8.1",
 			Description:        "help text",
-			Packages: []build.Package{
+			Packages: []core.Package{
 				{
 					Name:    "xxhash",
 					Version: "0.8.1",
@@ -139,7 +125,7 @@ func TestServerMock(t *testing.T) {
 					OutputError: "error validating request: package names required\n",
 				},
 			} {
-				resp, err := server.Client().Post(server.URL+endpointEnvsBuild, "application/json", //nolint:noctx
+				resp, err := http.Post(addr+endpointEnvsBuild, "application/json", //nolint:noctx
 					strings.NewReader(test.InputJSON))
 
 				So(err, ShouldBeNil)
@@ -151,8 +137,8 @@ func TestServerMock(t *testing.T) {
 		})
 
 		Convey("After which you can get the queued/building/built status for it", func() {
-			mb.requested = append(mb.requested, time.Now())
-			resp, err := server.Client().Get(server.URL + endpointEnvsStatus) //nolint:noctx
+			mb.Requested = append(mb.Requested, time.Now())
+			resp, err := http.Get(addr + endpointEnvsStatus) //nolint:noctx
 			So(err, ShouldBeNil)
 			So(resp.StatusCode, ShouldEqual, http.StatusOK)
 			var statuses []build.Status
@@ -160,13 +146,13 @@ func TestServerMock(t *testing.T) {
 			So(err, ShouldBeNil)
 			So(len(statuses), ShouldEqual, 1)
 			So(statuses[0].Name, ShouldEqual, "users/user/myenv-0.8.1")
-			So(*statuses[0].Requested, ShouldHappenWithin, 0*time.Microsecond, mb.requested[0])
+			So(*statuses[0].Requested, ShouldHappenWithin, 0*time.Microsecond, mb.Requested[0])
 
-			postToBuildEndpoint(server, "users/user/myotherenv", "1")
+			postToBuildEndpoint(addr, "users/user/myotherenv", "1")
 
-			mb.requested = append(mb.requested, time.Now())
+			mb.Requested = append(mb.Requested, time.Now())
 
-			resp, err = server.Client().Get(server.URL + endpointEnvsStatus) //nolint:noctx
+			resp, err = http.Get(addr + endpointEnvsStatus) //nolint:noctx
 			So(err, ShouldBeNil)
 			So(resp.StatusCode, ShouldEqual, http.StatusOK)
 			statuses = []build.Status{}
@@ -175,21 +161,20 @@ func TestServerMock(t *testing.T) {
 			So(len(statuses), ShouldEqual, 2)
 			So(statuses[0].Name, ShouldEqual, "users/user/myenv-0.8.1")
 			So(statuses[1].Name, ShouldEqual, "users/user/myotherenv-1")
-			So(*statuses[1].Requested, ShouldHappenWithin, 0*time.Microsecond, mb.requested[1])
+			So(*statuses[1].Requested, ShouldHappenWithin, 0*time.Microsecond, mb.Requested[1])
 		})
 	})
 }
 
 func TestServerReal(t *testing.T) {
 	Convey("With a real builder", t, func() {
-		ms3 := &internal.MockS3{}
+		ms3 := &s3mock.MockS3{}
 		mockStatusPollInterval := 1 * time.Millisecond
-		mwr := internal.NewMockWR(mockStatusPollInterval, 10*time.Millisecond)
-		mc := &core.MockCore{Files: make(map[string]string)}
+		mwr := wrmock.NewMockWR(mockStatusPollInterval, 10*time.Millisecond)
+		mc := coremock.NewMockCore()
 		msc := httptest.NewServer(mc)
 
 		gm, _ := gitmock.New()
-
 		gmhttp := httptest.NewServer(gm)
 
 		var conf config.Config
@@ -204,15 +189,22 @@ func TestServerReal(t *testing.T) {
 		builder, err := build.New(&conf, ms3, mwr)
 		So(err, ShouldBeNil)
 
-		handler := New(builder)
-		server := httptest.NewServer(handler)
-		So(server != nil, ShouldBeTrue)
+		l, err := NewListener("")
+		So(err, ShouldBeNil)
+		addr := "http://" + l.Addr().String()
+
+		s := New(builder, &config.Config{})
+		defer s.Stop()
+
+		go func() {
+			s.Start(l) //nolint:errcheck
+		}()
 
 		buildSubmitted := time.Now()
-		postToBuildEndpoint(server, "users/user/myenv", "0.8.1")
+		postToBuildEndpoint(addr, "users/user/myenv", "0.8.1")
 
 		Convey("you get a real status", func() {
-			statuses := getTestStatuses(server)
+			statuses := getTestStatuses(addr)
 			So(len(statuses), ShouldEqual, 1)
 			So(statuses[0].Name, ShouldEqual, "users/user/myenv-0.8.1")
 			So(*statuses[0].Requested, ShouldHappenAfter, buildSubmitted)
@@ -222,7 +214,7 @@ func TestServerReal(t *testing.T) {
 			runT := time.Now()
 			mwr.SetRunning()
 			<-time.After(2 * mockStatusPollInterval)
-			statuses = getTestStatuses(server)
+			statuses = getTestStatuses(addr)
 			So(len(statuses), ShouldEqual, 1)
 			So(*statuses[0].Requested, ShouldHappenAfter, buildSubmitted)
 			buildStart := *statuses[0].BuildStart
@@ -230,14 +222,76 @@ func TestServerReal(t *testing.T) {
 			So(statuses[0].BuildDone, ShouldBeNil)
 
 			<-time.After(mwr.JobDuration)
-			statuses = getTestStatuses(server)
+			statuses = getTestStatuses(addr)
 			So(*statuses[0].BuildDone, ShouldHappenAfter, buildStart)
+		})
+
+		Convey("you can retrigger queued builds", func() {
+			conf, err := config.GetConfig("")
+			if err != nil || conf.CoreURL == "" || conf.ListenURL == "" {
+				SkipConvey("Skipping further tests; set CoreURL and ListenURL in config file", func() {})
+
+				return
+			}
+
+			c, err := core.New(conf)
+			So(err, ShouldBeNil)
+
+			path := "users/foo/env"
+			desc := "a desc"
+			pkgs := core.Packages{
+				{
+					Name:    "pckA",
+					Version: "1",
+				},
+				{
+
+					Name:    "pckB",
+					Version: "2",
+				},
+			}
+			err = c.Create(path, desc, pkgs)
+			So(err, ShouldNotBeNil)
+			defer c.Delete(path + "-1") //nolint:errcheck
+
+			mb := new(buildermock.MockBuilder)
+			So(len(mb.Received), ShouldEqual, 0)
+
+			l, err = NewListener(conf.ListenURL)
+			So(err, ShouldBeNil)
+
+			s := New(mb, conf)
+			errCh := make(chan error)
+
+			go func() {
+				defer s.Stop()
+				errCh <- s.Start(l)
+			}()
+
+			ok := s.WaitUntilStarted()
+			So(ok, ShouldBeTrue)
+			So(len(mb.Received), ShouldBeGreaterThanOrEqualTo, 1)
+
+			found := false
+
+			for _, def := range mb.Received {
+				if def.EnvironmentName == filepath.Base(path) && def.EnvironmentPath == filepath.Dir(path)+"/" {
+					found = true
+
+					break
+				}
+			}
+
+			So(found, ShouldBeTrue)
+
+			s.Stop()
+			So(<-errCh, ShouldBeNil)
 		})
 	})
 }
 
-func postToBuildEndpoint(server *httptest.Server, name, version string) {
-	resp, err := server.Client().Post(server.URL+endpointEnvsBuild, "application/json", //nolint:noctx
+func postToBuildEndpoint(serverURL, name, version string) {
+	resp, err := http.Post(serverURL+endpointEnvsBuild, "application/json", //nolint:noctx
 		strings.NewReader(`
 {
 	"name": "`+name+`",
@@ -253,8 +307,8 @@ func postToBuildEndpoint(server *httptest.Server, name, version string) {
 	So(resp.StatusCode, ShouldEqual, http.StatusOK)
 }
 
-func getTestStatuses(server *httptest.Server) []build.Status {
-	resp, err := server.Client().Get(server.URL + endpointEnvsStatus) //nolint:noctx
+func getTestStatuses(serverURL string) []build.Status {
+	resp, err := http.Get(serverURL + endpointEnvsStatus) //nolint:noctx
 	So(err, ShouldBeNil)
 	So(resp.StatusCode, ShouldEqual, http.StatusOK)
 

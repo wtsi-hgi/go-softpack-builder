@@ -27,7 +27,10 @@ import (
 	"fmt"
 	"io"
 	"net/url"
+	"os"
+	"path/filepath"
 
+	"github.com/wtsi-hgi/go-softpack-builder/internal"
 	yaml "gopkg.in/yaml.v3"
 )
 
@@ -55,6 +58,33 @@ type Config struct {
 	CoreURL      string `yaml:"coreURL"`
 	ListenURL    string `yaml:"listenURL"`
 	WRDeployment string `yaml:"wrDeployment"`
+}
+
+// GetConfig returns a config based on the given config file path. If it's
+// blank, looks for ~/.softpack/builder/gsb-config.yml.
+func GetConfig(configPath string) (*Config, error) {
+	if configPath == "" {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return nil, internal.Error(fmt.Sprintf("could not get home dir: %s", err))
+		}
+
+		configPath = filepath.Join(home, ".softpack", "builder", "gsb-config.yml")
+	}
+
+	f, err := os.Open(configPath)
+	if err != nil {
+		return nil, err
+	}
+
+	conf, err := Parse(f)
+	f.Close()
+
+	if err != nil {
+		return nil, err
+	}
+
+	return conf, nil
 }
 
 // Parse parses a YAML file of our config options.

@@ -27,12 +27,12 @@ import (
 	"testing"
 
 	. "github.com/smartystreets/goconvey/convey"
-	"github.com/wtsi-hgi/go-softpack-builder/internal"
+	"github.com/wtsi-hgi/go-softpack-builder/internal/tests"
 )
 
 func TestConfig(t *testing.T) {
 	Convey("Given a yaml config file, it can be Parse()d", t, func() {
-		configData, err := internal.TestData.Open("testdata/config.yml")
+		configData, err := tests.TestData.Open("testdata/config.yml")
 		So(err, ShouldBeNil)
 
 		config, err := Parse(configData)

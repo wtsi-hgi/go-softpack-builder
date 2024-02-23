@@ -42,9 +42,9 @@ import (
 	"time"
 
 	"github.com/wtsi-hgi/go-softpack-builder/config"
+	"github.com/wtsi-hgi/go-softpack-builder/core"
 	"github.com/wtsi-hgi/go-softpack-builder/git"
 	"github.com/wtsi-hgi/go-softpack-builder/internal"
-	"github.com/wtsi-hgi/go-softpack-builder/internal/core"
 	"github.com/wtsi-hgi/go-softpack-builder/s3"
 	"github.com/wtsi-hgi/go-softpack-builder/wr"
 )
@@ -73,42 +73,7 @@ const (
 
 	ErrInvalidEnvPath = internal.Error("invalid environment path")
 	ErrInvalidVersion = internal.Error("environment version required")
-	ErrNoPackages     = internal.Error("packages required")
-	ErrNoPackageName  = internal.Error("package names required")
 )
-
-// Package describes the name and optional version of a spack package.
-type Package struct {
-	Name    string
-	Version string
-}
-
-// Validate returns an error if Name isn't set.
-func (p *Package) Validate() error {
-	if p.Name == "" {
-		return ErrNoPackageName
-	}
-
-	return nil
-}
-
-type Packages []Package
-
-// Validate returns an error if p is zero length, or any of its Packages are
-// invalid.
-func (p Packages) Validate() error {
-	if len(p) == 0 {
-		return ErrNoPackages
-	}
-
-	for _, pkg := range p {
-		if pkg.Name == "" {
-			return ErrNoPackageName
-		}
-	}
-
-	return nil
-}
 
 // Definition describes the environment a user wanted to create, which
 // comprises a EnvironmentPath such as "users/username", and EnvironmentName
@@ -120,7 +85,7 @@ type Definition struct {
 	EnvironmentName    string
 	EnvironmentVersion string
 	Description        string
-	Packages           Packages
+	Packages           core.Packages
 }
 
 // FullEnvironmentPath returns the complete environment path: the location under
@@ -248,7 +213,7 @@ type templateVars struct {
 	BuildImage      string
 	FinalImage      string
 	ExtraExes       []string
-	Packages        []Package
+	Packages        []core.Package
 }
 
 // SetPostBuildCallback causes the passed callback to be called after the
@@ -507,7 +472,7 @@ func (b *Builder) prepareArtifactsFromS3AndSendToCoreAndS3(def *Definition, s3Pa
 		return err
 	}
 
-	concreteSpackYAMLFile, err := b.generateAndUploadSpackYAML(lockData, def.Description, exes, s3Path)
+	concreteSpackYAMLFile, err := b.generateAndUploadSoftpackYAML(lockData, def.Description, exes, s3Path)
 	if err != nil {
 		return err
 	}
@@ -549,19 +514,19 @@ func (b *Builder) getArtifactDataFromS3(s3Path string) (io.Reader, []byte, error
 	return logData, lockData, nil
 }
 
-func (b *Builder) generateAndUploadSpackYAML(lockData []byte, description string,
+func (b *Builder) generateAndUploadSoftpackYAML(lockData []byte, description string,
 	exes []string, s3Path string) (string, error) {
-	concreteSpackYAMLFile, err := SpackLockToSoftPackYML(lockData, description, exes)
+	concreteSoftpackYAMLFile, err := SpackLockToSoftPackYML(lockData, description, exes)
 	if err != nil {
 		return "", err
 	}
 
-	if err = b.s3.UploadData(strings.NewReader(concreteSpackYAMLFile),
+	if err = b.s3.UploadData(strings.NewReader(concreteSoftpackYAMLFile),
 		filepath.Join(s3Path, core.SoftpackYaml)); err != nil {
 		return "", err
 	}
 
-	return concreteSpackYAMLFile, nil
+	return concreteSoftpackYAMLFile, nil
 }
 
 type ConcreteSpec struct {

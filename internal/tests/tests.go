@@ -21,59 +21,46 @@
  * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  ******************************************************************************/
 
-// package cmd is the cobra file that enables subcommands and handles
-// command-line args.
-
-package cmd
+package tests
 
 import (
-	"fmt"
-	"log/slog"
-	"os"
-
-	"github.com/spf13/cobra"
+	"embed"
+	"strings"
+	"sync"
 )
 
-// global options.
-var configPath string
+//go:embed testdata
+var TestData embed.FS
 
-// RootCmd represents the base command when called without any subcommands.
-var RootCmd = &cobra.Command{
-	Use:   os.Args[0],
-	Short: "gsb is a softpack builder",
-	Long: `gsb is a softpack builder.
-
-Start the server with the sever subcommand, then you can use the build
-subcommand to build new softpack environments.
-`,
+// ConcurrentStringBuilder should be used when testing slog logging:
+//
+//	var logWriter internal.ConcurrentStringBuilder
+//	slog.SetDefault(slog.New(slog.NewTextHandler(&logWriter, nil)))
+type ConcurrentStringBuilder struct {
+	mu sync.RWMutex
+	strings.Builder
 }
 
-func init() {
-	RootCmd.PersistentFlags().StringVar(&configPath, "config", "",
-		"path to config file")
+// Write is for implementing io.Writer.
+func (c *ConcurrentStringBuilder) Write(p []byte) (int, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	return c.Builder.Write(p)
 }
 
-// Execute adds all child commands to the root command and sets flags
-// appropriately. This is called by main.main(). It only needs to happen once to
-// the rootCmd.
-func Execute() {
-	if err := RootCmd.Execute(); err != nil {
-		die(err.Error())
-	}
+// WriteString is for implementing io.Writer.
+func (c *ConcurrentStringBuilder) WriteString(str string) (int, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	return c.Builder.WriteString(str)
 }
 
-// info is a convenience to log a message at the Info level.
-func info(msg string, a ...interface{}) {
-	slog.Info(fmt.Sprintf(msg, a...))
-}
+// String returns the current logs messages as a string.
+func (c *ConcurrentStringBuilder) String() string {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 
-// die is a convenience to log a message at the Error level and exit non zero.
-func die(msg string, a ...interface{}) {
-	slog.Error(fmt.Sprintf(msg, a...))
-	os.Exit(1)
-}
-
-// cliPrint outputs the message to STDOUT.
-func cliPrint(msg string, a ...interface{}) {
-	fmt.Fprintf(os.Stdout, msg, a...)
+	return c.Builder.String()
 }

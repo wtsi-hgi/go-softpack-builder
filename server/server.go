@@ -26,16 +26,24 @@ package server
 import (
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
 	"path"
+	"time"
 
 	"github.com/wtsi-hgi/go-softpack-builder/build"
+	"github.com/wtsi-hgi/go-softpack-builder/config"
+	"github.com/wtsi-hgi/go-softpack-builder/core"
+	"gopkg.in/tylerb/graceful.v1"
 )
 
 const (
-	endpointEnvs       = "/environments"
-	endpointEnvsBuild  = endpointEnvs + "/build"
-	endpointEnvsStatus = endpointEnvs + "/status"
+	endpointEnvs            = "/environments"
+	endpointEnvsBuild       = endpointEnvs + "/build"
+	endpointEnvsStatus      = endpointEnvs + "/status"
+	stopTimeout             = 10 * time.Second
+	readHeaderTimeout       = 20 * time.Second
+	waitUntilStartedTimeout = 30 * time.Second
 )
 
 type Error string
@@ -55,28 +63,122 @@ type Builder interface {
 // environment.
 type Request struct {
 	Name    string
-	Version string
+	Version string `json:"version,omitempty"`
 	Model   struct {
 		Description string
-		Packages    []build.Package
+		Packages    []core.Package
 	}
+}
+
+type Server struct {
+	b         Builder
+	srv       *graceful.Server
+	c         *core.Core
+	startedCh chan struct{}
 }
 
 // New takes a Builder that will be sent a Definition when the returned Handler
 // receives request JSON POSTed to /environments/build, and uses the Builder to
 // get status information for builds when it receives a GET request to
-// /environments/status.
-func New(b Builder) http.Handler {
+// /environments/status. It uses the config to get your core URL, and if set
+// will trigger the core service to resend pending builds to us after Start().
+func New(b Builder, c *config.Config) *Server {
+	s := &Server{
+		b: b,
+	}
+
+	cor, err := core.New(c)
+	if err == nil {
+		s.c = cor
+		s.startedCh = make(chan struct{})
+	}
+
+	return s
+}
+
+// Start starts a server using the given listener (you can get one from
+// NewListener()). Blocks until Stop() is called, or a kill signal is received.
+//
+// You should always defer Stop(), regardless of this returning an error.
+//
+// If we had been configured with core details, core will be asked to resend its
+// queued environments.
+func (s *Server) Start(l net.Listener) error {
+	s.srv = &graceful.Server{
+		Timeout: stopTimeout,
+
+		Server: &http.Server{
+			Handler:           s.endpointsHandler(),
+			ReadHeaderTimeout: readHeaderTimeout,
+		},
+	}
+
+	errCh := make(chan error, 1)
+
+	go func() {
+		errCh <- s.srv.Serve(l)
+	}()
+
+	err := s.resendPendingBuildsIfCoreConfigured()
+	if err != nil {
+		return err
+	}
+
+	return <-errCh
+}
+
+func (s *Server) endpointsHandler() http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case endpointEnvsBuild:
-			handleEnvBuild(b, w, r)
+			handleEnvBuild(s.b, w, r)
 		case endpointEnvsStatus:
-			handleEnvStatus(b, w)
+			handleEnvStatus(s.b, w)
 		default:
 			http.Error(w, fmt.Sprintf("go-softpack-builder: no such endpoint: %s", r.URL.Path), http.StatusNotFound)
 		}
 	})
+}
+
+func (s *Server) resendPendingBuildsIfCoreConfigured() error {
+	if s.c == nil {
+		return nil
+	}
+
+	err := s.c.ResendPendingBuilds()
+	close(s.startedCh)
+
+	return err
+}
+
+// WaitUntilStarted blocks until Start() brings up a listener and the core
+// service talks to us. Will only work if we were configured with core details
+// and the core is working. There is a timeout; will return false if the timeout
+// expires, or core details weren't configured.
+func (s *Server) WaitUntilStarted() bool {
+	if s.startedCh == nil {
+		return false
+	}
+
+	timeout := time.NewTimer(waitUntilStartedTimeout)
+
+	select {
+	case <-s.startedCh:
+		return true
+	case <-timeout.C:
+		return false
+	}
+}
+
+// NewListener returns a listener that listens on the given URL. If blank,
+// listens on a random localhost port. You can use l.Addr().String() to get the
+// address.
+func NewListener(listenURL string) (net.Listener, error) {
+	if listenURL == "" {
+		listenURL = "127.0.0.1:0"
+	}
+
+	return net.Listen("tcp", listenURL)
 }
 
 func handleEnvBuild(b Builder, w http.ResponseWriter, r *http.Request) {
@@ -108,4 +210,8 @@ func handleEnvStatus(b Builder, w http.ResponseWriter) {
 	if err != nil {
 		http.Error(w, fmt.Sprintf("error serialising status: %s", err), http.StatusInternalServerError)
 	}
+}
+
+func (s *Server) Stop() {
+	s.srv.Stop(stopTimeout)
 }

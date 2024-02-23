@@ -22,13 +22,13 @@ install:
 
 test: export CGO_ENABLED = 0
 test:
-	@go test -tags netgo --count 1 .
-	@go test -tags netgo --count 1 $(shell go list ./... | tail -n+2)
+	@go test -tags netgo --count 1 -p 1 .
+	@go test -tags netgo --count 1 -p 1 $(shell go list ./... | tail -n+2)
 
 race: export CGO_ENABLED = 1
 race:
-	@go test -tags netgo -race --count 1 .
-	@go test -tags netgo -race --count 1 $(shell go list ./... | tail -n+2)
+	@go test -tags netgo -race --count 1 -p 1 .
+	@go test -tags netgo -race --count 1 -p 1 $(shell go list ./... | tail -n+2)
 
 # curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.54.2
 lint:

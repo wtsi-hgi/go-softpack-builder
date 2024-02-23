@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2023 Genome Research Ltd.
+ * Copyright (c) 2024 Genome Research Ltd.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -21,55 +21,18 @@
  * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  ******************************************************************************/
 
-package internal
+package s3mock
 
 import (
-	"embed"
 	"io"
 	"path/filepath"
 	"strings"
-	"sync"
-	"time"
 
-	"github.com/wtsi-hgi/go-softpack-builder/internal/core"
-	"github.com/wtsi-hgi/go-softpack-builder/wr"
+	"github.com/wtsi-hgi/go-softpack-builder/core"
+	"github.com/wtsi-hgi/go-softpack-builder/internal"
 )
 
-//go:embed testdata
-var TestData embed.FS
-
-// ConcurrentStringBuilder should be used when testing slog logging:
-//
-//	var logWriter internal.ConcurrentStringBuilder
-//	slog.SetDefault(slog.New(slog.NewTextHandler(&logWriter, nil)))
-type ConcurrentStringBuilder struct {
-	mu sync.RWMutex
-	strings.Builder
-}
-
-// Write is for implementing io.Writer.
-func (c *ConcurrentStringBuilder) Write(p []byte) (int, error) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	return c.Builder.Write(p)
-}
-
-// WriteString is for implementing io.Writer.
-func (c *ConcurrentStringBuilder) WriteString(str string) (int, error) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	return c.Builder.WriteString(str)
-}
-
-// String returns the current logs messages as a string.
-func (c *ConcurrentStringBuilder) String() string {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-
-	return c.Builder.String()
-}
+const ErrS3Mock = internal.Error("Mock S3 error")
 
 // MockS3 can be used to test a build.Builder by implementing the build.S3
 // interface.
@@ -82,12 +45,10 @@ type MockS3 struct {
 	Exes        string
 }
 
-const ErrMock = Error("Mock error")
-
 // UploadData implements the build.S3 interface.
 func (m *MockS3) UploadData(data io.Reader, dest string) error {
 	if m.Fail {
-		return ErrMock
+		return ErrS3Mock
 	}
 
 	buff, err := io.ReadAll(data)
@@ -127,79 +88,4 @@ func (m *MockS3) OpenFile(source string) (io.ReadCloser, error) {
 	}
 
 	return nil, io.ErrUnexpectedEOF
-}
-
-// MockWR can be used to test a build.Builder without having real wr running.
-type MockWR struct {
-	Cmd                   string
-	Fail                  bool
-	PollForStatusInterval time.Duration
-	JobDuration           time.Duration
-
-	sync.RWMutex
-	ReturnStatus wr.WRJobStatus
-}
-
-func NewMockWR(pollForStatusInterval, jobDuration time.Duration) *MockWR {
-	return &MockWR{
-		PollForStatusInterval: pollForStatusInterval,
-		JobDuration:           jobDuration,
-	}
-}
-
-// Add implements build.Runner interface.
-func (m *MockWR) Add(cmd string) (string, error) { //nolint:unparam
-	m.Cmd = cmd
-
-	return "abc123", nil
-}
-
-// SetRunning should be used before waiting on Ch and if you need to test
-// BuildStart time in Status.
-func (m *MockWR) SetRunning() {
-	m.Lock()
-	defer m.Unlock()
-
-	m.ReturnStatus = wr.WRJobStatusRunning
-}
-
-func (m *MockWR) SetComplete() {
-	m.Lock()
-	defer m.Unlock()
-
-	m.ReturnStatus = wr.WRJobStatusComplete
-}
-
-// WaitForRunning implements build.Runner interface.
-func (m *MockWR) WaitForRunning(string) error { //nolint:unparam
-	for {
-		m.RLock()
-		rs := m.ReturnStatus
-		m.RUnlock()
-
-		if rs == wr.WRJobStatusRunning || rs == wr.WRJobStatusBuried || rs == wr.WRJobStatusComplete {
-			return nil
-		}
-
-		<-time.After(m.PollForStatusInterval)
-	}
-}
-
-// Wait implements build.Runner interface.
-func (m *MockWR) Wait(string) (wr.WRJobStatus, error) {
-	<-time.After(m.JobDuration)
-
-	if m.Fail {
-		return wr.WRJobStatusBuried, nil
-	}
-
-	return wr.WRJobStatusComplete, nil
-}
-
-// Status implements build.Runner interface.
-func (m *MockWR) Status(string) (wr.WRJobStatus, error) { //nolint:unparam
-	m.RLock()
-	defer m.RUnlock()
-
-	return m.ReturnStatus, nil
 }

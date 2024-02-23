@@ -38,9 +38,13 @@ import (
 
 	. "github.com/smartystreets/goconvey/convey"
 	"github.com/wtsi-hgi/go-softpack-builder/config"
+	"github.com/wtsi-hgi/go-softpack-builder/core"
 	"github.com/wtsi-hgi/go-softpack-builder/internal"
-	"github.com/wtsi-hgi/go-softpack-builder/internal/core"
+	"github.com/wtsi-hgi/go-softpack-builder/internal/coremock"
 	"github.com/wtsi-hgi/go-softpack-builder/internal/gitmock"
+	"github.com/wtsi-hgi/go-softpack-builder/internal/s3mock"
+	"github.com/wtsi-hgi/go-softpack-builder/internal/tests"
+	"github.com/wtsi-hgi/go-softpack-builder/internal/wrmock"
 	"github.com/wtsi-hgi/go-softpack-builder/wr"
 )
 
@@ -71,9 +75,9 @@ func (m *modifyRunner) Status(id string) (wr.WRJobStatus, error) {
 
 func TestBuilder(t *testing.T) {
 	Convey("Given binary cache and spack repo details and a Definition", t, func() {
-		ms3 := &internal.MockS3{}
-		mwr := internal.NewMockWR(1*time.Millisecond, 10*time.Millisecond)
-		mc := &core.MockCore{Files: make(map[string]string)}
+		ms3 := &s3mock.MockS3{}
+		mwr := wrmock.NewMockWR(1*time.Millisecond, 10*time.Millisecond)
+		mc := coremock.NewMockCore()
 		msc := httptest.NewServer(mc)
 
 		gm, commitHash := gitmock.New()
@@ -208,7 +212,7 @@ Stage: final
 			})
 		})
 
-		var logWriter internal.ConcurrentStringBuilder
+		var logWriter tests.ConcurrentStringBuilder
 		slog.SetDefault(slog.New(slog.NewTextHandler(&logWriter, &slog.HandlerOptions{Level: slog.LevelInfo})))
 
 		Convey("You can do a Build", func() {
@@ -231,7 +235,7 @@ Stage: final
 			_, err = mwr.Wait("")
 			So(err, ShouldBeNil)
 			hash := fmt.Sprintf("%X", sha256.Sum256([]byte(ms3.Data)))
-			So(mwr.Cmd, ShouldContainSubstring, "echo doing build with hash "+hash+"; sudo singularity build")
+			So(mwr.GetLastCmd(), ShouldContainSubstring, "echo doing build with hash "+hash+"; sudo singularity build")
 
 			modulePath := filepath.Join(conf.Module.ModuleInstallDir,
 				def.EnvironmentPath, def.EnvironmentName, def.EnvironmentVersion)
@@ -459,7 +463,7 @@ func getExampleDefinition() *Definition {
 		EnvironmentName:    "xxhash",
 		EnvironmentVersion: "0.8.1",
 		Description:        "some help text",
-		Packages: []Package{
+		Packages: []core.Package{
 			{
 				Name:    "xxhash",
 				Version: "0.8.1",

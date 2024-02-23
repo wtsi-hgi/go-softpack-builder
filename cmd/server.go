@@ -25,9 +25,7 @@ package cmd
 
 import (
 	"log/slog"
-	"net/http"
 	"os"
-	"path/filepath"
 
 	"github.com/spf13/cobra"
 	"github.com/wtsi-hgi/go-softpack-builder/build"
@@ -36,8 +34,7 @@ import (
 	"github.com/wtsi-hgi/go-softpack-builder/server"
 )
 
-// global options.
-var configPath string
+// Options for this sub-command.
 var debug bool
 
 var serverCmd = &cobra.Command{
@@ -120,6 +117,9 @@ Where:
   git repository and make them visible on the softpack frontend.
 - listenURL is the address gsb will listen on for new build requests from core.
 
+At start up, it asks core to resend any queued environments to us, so that you
+can safely restart this service without losing any environment build requests.
+
 It also runs spack buildcache update-index (examine all files in S3 and produce
 a new index.json summarising the available cached builds). It does this at most
 once every reindexHours hours, but only if there has been a new build in the
@@ -133,20 +133,31 @@ past reindexHours, and only if a reindex is not still ongoing.
 			slog.SetDefault(slog.New(h))
 		}
 
-		conf := getConfig()
+		conf, err := config.GetConfig(configPath)
+		if err != nil {
+			die("could not load config: %s", err)
+		}
 
 		b, err := build.New(conf, nil, nil)
 		if err != nil {
 			die("could not create a builder: %s", err)
 		}
 
-		s := reindex.NewScheduler(conf, b)
-		s.Start()
+		sch := reindex.NewScheduler(conf, b)
+		sch.Start()
+		defer sch.Stop()
+
+		s := server.New(b, conf)
 		defer s.Stop()
 
-		err = http.ListenAndServe(conf.ListenURL, server.New(b)) //nolint:gosec
+		l, err := server.NewListener(conf.ListenURL)
 		if err != nil {
-			die("could not start server: %s", err)
+			die("could not create listener: %s", err)
+		}
+
+		err = s.Start(l)
+		if err != nil {
+			die("non-graceful stop: %s", err)
 		}
 	},
 }
@@ -154,33 +165,6 @@ past reindexHours, and only if a reindex is not still ongoing.
 func init() {
 	RootCmd.AddCommand(serverCmd)
 
-	serverCmd.Flags().StringVar(&configPath, "config", "",
-		"path to config file")
 	serverCmd.Flags().BoolVar(&debug, "debug", false,
 		"turn on debug logging output")
-}
-
-func getConfig() *config.Config {
-	if configPath == "" {
-		home, err := os.UserHomeDir()
-		if err != nil {
-			die("could not get home dir: %s", err)
-		}
-
-		configPath = filepath.Join(home, ".softpack", "builder", "gsb-config.yml")
-	}
-
-	f, err := os.Open(configPath)
-	if err != nil {
-		die("could not open config file: %s", err)
-	}
-
-	conf, err := config.Parse(f)
-	f.Close()
-
-	if err != nil {
-		die("could not parse config file: %s", err)
-	}
-
-	return conf
 }

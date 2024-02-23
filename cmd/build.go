@@ -25,20 +25,18 @@ package cmd
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"io"
-	"net/http"
-	"net/url"
 	"os"
 	"strings"
 
 	"github.com/spf13/cobra"
-	"github.com/wtsi-hgi/go-softpack-builder/build"
-	"github.com/wtsi-hgi/go-softpack-builder/server"
+	"github.com/wtsi-hgi/go-softpack-builder/config"
+	"github.com/wtsi-hgi/go-softpack-builder/core"
 	"golang.org/x/sys/unix"
 )
 
+// Options for this sub-command.
 var buildPath, buildVersion, buildDescription, buildPackagesPath, buildURL string
 
 var buildCmd = &cobra.Command{
@@ -48,39 +46,25 @@ var buildCmd = &cobra.Command{
 
 Allows manual builds without a softpack client.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		if buildURL == "" {
-			die("no gsb URL supplied")
-		} else if _, err := url.Parse(buildURL); err != nil {
-			die("invalid gsb URL supplied: %s", err)
-		}
-
-		var p server.Request
-
-		p.Name = readInput("Enter environment path: ", buildPath)
-		p.Version = readInput("Enter environment version: ", buildVersion)
-		p.Model.Description = readInput("Enter environment description (single line): ", buildDescription)
-		p.Model.Packages = getPackageList(buildPackagesPath)
-
-		pr, pw := io.Pipe()
-
-		go func() {
-			json.NewEncoder(pw).Encode(p) //nolint:errcheck
-			pw.Close()
-		}()
-
-		req, err := http.NewRequest(http.MethodPost, buildURL, pr)
+		conf, err := config.GetConfig(configPath)
 		if err != nil {
-			die("failed to create build request: %s", err)
+			die("could not load config: %s", err)
 		}
 
-		resp, err := http.DefaultClient.Do(req)
+		c, err := core.New(conf)
 		if err != nil {
-			die("failed to send request to builder: %s", err)
+			die("failed to load core config: %s", err)
 		}
 
-		if _, err = io.Copy(os.Stdout, resp.Body); err != nil {
-			die("failed to copy response to stdout: %s", err)
+		path := readInput("Enter environment path: ", buildPath)
+		desc := readInput("Enter environment description (single line): ", buildDescription)
+		pkgs := getPackageList(buildPackagesPath)
+		err = c.Create(path, desc, pkgs)
+		if err != nil {
+			die("failed to create environment (but it might be queued for later): %s", err)
 		}
+
+		info("environment build successfully scheduled")
 	},
 }
 
@@ -88,7 +72,6 @@ func init() {
 	RootCmd.AddCommand(buildCmd)
 
 	buildCmd.Flags().StringVarP(&buildPath, "path", "p", "", "environment path")
-	buildCmd.Flags().StringVarP(&buildVersion, "version", "v", "1.0", "environment version")
 	buildCmd.Flags().StringVarP(&buildDescription, "description", "d", "", "environment description")
 	buildCmd.Flags().StringVarP(&buildPackagesPath, "packages", "k", "-", "file with list of packages, one per line")
 	buildCmd.Flags().StringVarP(&buildURL, "url", "u", os.Getenv("GSB_URL"), "URL to running GSB server")
@@ -110,12 +93,12 @@ func readInput(prompt, given string) string {
 
 const pkgNameParts = 2
 
-func getPackageList(path string) build.Packages {
+func getPackageList(path string) core.Packages {
 	pkgsBytes := readPackageInput(path)
 
 	pkgList := strings.Split(string(pkgsBytes), "\n")
 
-	pkgs := make(build.Packages, len(pkgList))
+	pkgs := make(core.Packages, len(pkgList))
 
 	for n, pkgStr := range pkgList {
 		parts := strings.SplitN(strings.TrimSpace(pkgStr), "@", pkgNameParts)
