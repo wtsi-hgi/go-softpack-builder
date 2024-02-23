@@ -117,6 +117,9 @@ Where:
   git repository and make them visible on the softpack frontend.
 - listenURL is the address gsb will listen on for new build requests from core.
 
+At start up, it asks core to resend any queued environments to us, so that you
+can safely restart this service without losing any environment build requests.
+
 It also runs spack buildcache update-index (examine all files in S3 and produce
 a new index.json summarising the available cached builds). It does this at most
 once every reindexHours hours, but only if there has been a new build in the

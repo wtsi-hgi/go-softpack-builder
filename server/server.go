@@ -152,7 +152,7 @@ func (s *Server) resendPendingBuildsIfCoreConfigured() error {
 }
 
 // WaitUntilStarted blocks until Start() brings up a listener and the core
-// service talk to us. Will only work if we were configured with core details
+// service talks to us. Will only work if we were configured with core details
 // and the core is working. There is a timeout; will return false if the timeout
 // expires, or core details weren't configured.
 func (s *Server) WaitUntilStarted() bool {
