@@ -43,7 +43,7 @@ const (
 	endpointEnvsStatus      = endpointEnvs + "/status"
 	stopTimeout             = 10 * time.Second
 	readHeaderTimeout       = 20 * time.Second
-	waitUntilStartedTimeout = 10 * time.Second
+	waitUntilStartedTimeout = 30 * time.Second
 )
 
 type Error string
