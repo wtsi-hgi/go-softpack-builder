@@ -162,7 +162,7 @@ EOF
 	xargs file -i | \
 	grep 'charset=binary' | \
 	grep 'x-executable\|x-archive\|x-sharedlib' | \
-	awk -F: '{print $1}' | xargs strip
+	awk -F: '{print $1}' | xargs strip || true
 
 	exes="$(find $(grep "^export PATH=" /opt/spack-environment/environment_modifications.sh | sed -e 's/^export PATH=//' -e 's/;$//' | tr ":" "\n" | grep /opt/view | tr "\n" " ") -maxdepth 1 -executable -type l | xargs -r -L 1 readlink)"
 	{
