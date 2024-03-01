@@ -235,7 +235,7 @@ Stage: final
 			_, err = mwr.Wait("")
 			So(err, ShouldBeNil)
 			hash := fmt.Sprintf("%X", sha256.Sum256([]byte(ms3.Data)))
-			So(mwr.GetLastCmd(), ShouldContainSubstring, "echo doing build with hash "+hash+"; sudo singularity build")
+			So(mwr.GetLastCmd(), ShouldContainSubstring, "echo doing build with hash "+hash+"; if sudo singularity build")
 
 			modulePath := filepath.Join(conf.Module.ModuleInstallDir,
 				def.EnvironmentPath, def.EnvironmentName, def.EnvironmentVersion)

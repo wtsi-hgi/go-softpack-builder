@@ -50,10 +50,11 @@ func TestWR(t *testing.T) {
 		wrInput, err := SingularityBuildInS3WRInput(s3Path, hash)
 		So(err, ShouldBeNil)
 		So(wrInput, ShouldEqual, `{"cmd": "echo doing build with hash `+hash+`; `+
-			`sudo singularity build $TMPDIR/singularity.sif singularity.def &> builder.out && `+
-			`sudo singularity run $TMPDIR/singularity.sif cat /opt/spack-environment/executables > executables && `+
-			`sudo singularity run $TMPDIR/singularity.sif cat /opt/spack-environment/spack.lock > spack.lock && `+
-			`mv $TMPDIR/singularity.sif .", `+
+			`if sudo singularity build $TMPDIR/singularity.sif singularity.def &> $TMPDIR/builder.out; then `+
+			`sudo singularity run $TMPDIR/singularity.sif cat /opt/spack-environment/executables > $TMPDIR/executables && `+
+			`sudo singularity run $TMPDIR/singularity.sif cat /opt/spack-environment/spack.lock > $TMPDIR/spack.lock && `+
+			`mv $TMPDIR/singularity.sif $TMPDIR/builder.out $TMPDIR/executables $TMPDIR/spack.lock .; else `+
+			`mv $TMPDIR/builder.out . && false; fi", `+
 			`"retries": 0, "rep_grp": "singularity_build-spack/builds/users/user/myenv", "limit_grps": ["s3cache"], `+
 			`"mounts": [{"Targets": [{"Path":"spack/builds/users/user/myenv","Write":true,"Cache":true}]}]}`)
 
