@@ -319,6 +319,10 @@ packages:
   - r-seurat@4
 `
 
+			// softpack-web relies on softpack.yml files having this particular
+			// string to remove executables from descriptions during cloning
+			So(expectedSoftpackYaml, ShouldContainSubstring, "\n\n  The following executables are added to your PATH:")
+
 			expectedReadmeContent := "module load " + filepath.Join(moduleLoadPrefix, def.getS3Path())
 
 			for file, expectedData := range map[string]string{
