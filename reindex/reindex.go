@@ -37,6 +37,33 @@ type Builder interface {
 	SetPostBuildCallback(func())
 }
 
+type Reindexer struct {
+	conf *config.Config
+}
+
+func (r *Reindexer) Reindex() {
+	cmd := exec.Command(r.conf.Spack.Path, "buildcache", "update-index", "--", r.conf.S3.BinaryCache) //nolint:gosec
+	out, err := cmd.CombinedOutput()
+
+	var outstr, errstr string
+
+	if out != nil {
+		outstr = string(out)
+	}
+
+	if err != nil {
+		errstr = err.Error()
+	}
+
+	if err != nil || strings.Contains(outstr, "Error") {
+		slog.Error("spack reindex failed", "err", errstr, "out", outstr)
+	}
+}
+
+func New(conf *config.Config) *Reindexer {
+	return &Reindexer{conf: conf}
+}
+
 // Scheduler periodically updates the Spack buildcache index.
 type Scheduler struct {
 	*Throttler

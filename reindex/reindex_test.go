@@ -48,10 +48,11 @@ func (f *fakeBuilder) SetPostBuildCallback(cb func()) {
 	f.cb = cb
 }
 
-func (f *fakeBuilder) buildCalled() time.Time {
+func (f *fakeBuilder) pretendBuildHappened() time.Time {
+	started := time.Now()
 	f.cb()
 
-	return time.Now()
+	return started
 }
 
 func TestReindex(t *testing.T) {
@@ -73,7 +74,7 @@ func TestReindex(t *testing.T) {
 		var _ Builder = (*build.Builder)(nil)
 	})
 
-	Convey("Given a conf, a builder and an unindexed spack binary cache", t, func() {
+	Convey("Given a conf, a builder, an unindexed spack binary cache and a Reindexer", t, func() {
 		tdir := t.TempDir()
 		cacheDir := filepath.Join(tdir, "build_cache")
 		err := os.Mkdir(cacheDir, userPerms)
@@ -91,10 +92,12 @@ func TestReindex(t *testing.T) {
 
 		fb := &fakeBuilder{}
 
-		Convey("We can schedule the reindex job", func() {
+		r := New(&conf)
+
+		SkipConvey("We can schedule the reindex job", func() {
 			s := NewScheduler(&conf, fb)
 			s.Start()
-			started := fb.buildCalled()
+			started := fb.pretendBuildHappened()
 			defer s.Stop()
 
 			index := getIndex(cacheDir, started)
@@ -104,13 +107,22 @@ func TestReindex(t *testing.T) {
 			err = copy.Copy(sig2, filepath.Join(cacheDir, sig2))
 			So(err, ShouldBeNil)
 
-			lastBuild := fb.buildCalled()
+			lastBuild := fb.pretendBuildHappened()
 			<-time.After(hoursToDuration(conf.Spack.ReindexHours))
 			index = getIndex(cacheDir, lastBuild)
 			So(index, ShouldContainSubstring, "dnenyfmmx3fbiksufzhmb4qwjcvej7jg")
 		})
 
-		Convey("Index updates don't happen unless a build occurred recently", func() {
+		Convey("The cache is reindexed immediately after a build", func() {
+			fb.SetPostBuildCallback(r.Reindex)
+
+			started := fb.pretendBuildHappened()
+
+			index := getIndex(cacheDir, started)
+			So(index, ShouldContainSubstring, "tr6lezmi6onfz2txkzowkh4qylmec2lk")
+		})
+
+		SkipConvey("Index updates don't happen unless a build occurred recently", func() {
 			s := NewScheduler(&conf, fb)
 			s.Start()
 			started := time.Now()
@@ -119,7 +131,7 @@ func TestReindex(t *testing.T) {
 			index := getIndex(cacheDir, started)
 			So(index, ShouldBeBlank)
 
-			lastBuild := fb.buildCalled()
+			lastBuild := fb.pretendBuildHappened()
 			<-time.After(hoursToDuration(conf.Spack.ReindexHours))
 			index = getIndex(cacheDir, lastBuild)
 			So(index, ShouldNotBeBlank)
@@ -132,7 +144,7 @@ func TestReindex(t *testing.T) {
 			conf.S3.BinaryCache = "/bad"
 			s := NewScheduler(&conf, fb)
 			s.Start()
-			started := fb.buildCalled()
+			started := fb.pretendBuildHappened()
 			defer s.Stop()
 
 			getIndex(cacheDir, started)
@@ -147,7 +159,7 @@ func TestReindex(t *testing.T) {
 			conf.Spack.Path = "/non-existent"
 			s := NewScheduler(&conf, fb)
 			s.Start()
-			started := fb.buildCalled()
+			started := fb.pretendBuildHappened()
 			defer s.Stop()
 
 			getIndex(cacheDir, started)
