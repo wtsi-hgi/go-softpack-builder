@@ -24,9 +24,11 @@
 package reindex
 
 import (
+	"log/slog"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -35,6 +37,7 @@ import (
 	. "github.com/smartystreets/goconvey/convey"
 	"github.com/wtsi-hgi/go-softpack-builder/build"
 	"github.com/wtsi-hgi/go-softpack-builder/config"
+	"github.com/wtsi-hgi/go-softpack-builder/internal/tests"
 )
 
 const userPerms = 0700
@@ -53,30 +56,6 @@ func (f *fakeBuilder) pretendBuildHappened() time.Time {
 	f.cb()
 
 	return buildFinished
-}
-
-type fakeReindexer struct {
-	Reindexer
-	startTimes  []time.Time
-	finishTimes []time.Time
-	sync.Mutex
-}
-
-func newFake(conf *config.Config) *fakeReindexer {
-	return &fakeReindexer{
-		Reindexer: Reindexer{conf: conf},
-	}
-}
-
-func (r *fakeReindexer) ReindexLogger() {
-	started := time.Now()
-	r.Reindex()
-	finished := time.Now()
-
-	r.Lock()
-	defer r.Unlock()
-	r.startTimes = append(r.startTimes, started)
-	r.finishTimes = append(r.finishTimes, finished)
 }
 
 func TestReindex(t *testing.T) {
@@ -116,7 +95,7 @@ func TestReindex(t *testing.T) {
 
 		fb := &fakeBuilder{}
 
-		r := newFake(&conf)
+		r := New(&conf)
 
 		// SkipConvey("We can schedule the reindex job", func() {
 		// 	s := NewScheduler(&conf, fb)
@@ -155,9 +134,12 @@ func TestReindex(t *testing.T) {
 		})
 
 		Convey("Two builds finishing at the same time results in 2 sequential reindexes", func() {
-			fb.SetPostBuildCallback(r.ReindexLogger)
+			fb.SetPostBuildCallback(r.Reindex)
 
 			// finishTimesCh := make(chan time.Time, 2)
+
+			var logWriter tests.ConcurrentStringBuilder
+			slog.SetDefault(slog.New(slog.NewTextHandler(&logWriter, &slog.HandlerOptions{Level: slog.LevelInfo})))
 
 			var wg sync.WaitGroup
 
@@ -172,8 +154,20 @@ func TestReindex(t *testing.T) {
 
 			wg.Wait()
 
-			// but when did the actual reindex code start to run?
-			So(r.startTimes[1], ShouldHappenAfter, r.finishTimes[0])
+			// slog.Info("Reindex started", "id", "foo")
+
+			// time=2024-04-16T14:18:56.808+01:00 level=INFO msg="Reindex started" id=foo
+			logLines := strings.Split(logWriter.String(), "\n")
+
+			So(len(logLines), ShouldEqual, 4)
+
+			for i, line := range logLines {
+				if i%2 == 0 {
+					So(line, ShouldContainSubstring, "Reindex started")
+				} else {
+					So(line, ShouldContainSubstring, "Reindex finished")
+				}
+			}
 		})
 
 		// SkipConvey("Index updates don't happen unless a build occurred recently", func() {

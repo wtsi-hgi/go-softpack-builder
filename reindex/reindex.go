@@ -46,11 +46,17 @@ func New(conf *config.Config) *Reindexer {
 	return &Reindexer{conf: conf}
 }
 
-// Reindex runs `spack buildcache update-index` and logs when the reindex started and finished.
+// Reindex runs `spack buildcache update-index` on the configured S3
+// BinaryCache.
+//
+// If a reindex is currently running, queues the reindex until after the current
+// run.
+//
+// Logs when the reindex actually starts running, and when it ends, or if it
+// fails.
 func (r *Reindexer) Reindex() {
-	// start := time.Now()
-	r.Lock()
-	defer r.Unlock()
+	// r.Lock()
+	// defer r.Unlock()
 
 	cmd := exec.Command(r.conf.Spack.Path, "buildcache", "update-index", "--", r.conf.S3.BinaryCache) //nolint:gosec
 	out, err := cmd.CombinedOutput()
