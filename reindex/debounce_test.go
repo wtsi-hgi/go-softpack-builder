@@ -24,6 +24,7 @@
 package reindex
 
 import (
+	"sync"
 	"testing"
 	"time"
 
@@ -37,14 +38,27 @@ func TestDebounce(t *testing.T) {
 		callLength := 150 * time.Millisecond
 		throttleOp := func() {
 			startTimes <- time.Now()
+
 			<-time.After(callLength)
+
 			endTimes <- time.Now()
 		}
 
 		Convey("Debounce runs long-running tasks with no overlap", func() {
 			d := NewDebounce(throttleOp)
-			d.Start()
-			d.Start()
+
+			var wg sync.WaitGroup
+
+			for i := 0; i < 2; i++ {
+				wg.Add(1)
+
+				go func() {
+					defer wg.Done()
+					d.Run()
+				}()
+			}
+
+			wg.Wait()
 
 			start1 := <-startTimes
 			start2 := <-startTimes

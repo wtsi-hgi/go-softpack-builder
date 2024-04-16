@@ -42,8 +42,8 @@ func NewDebounce(op func()) *Debounce {
 	}
 }
 
-// Start starts running our op, but not if the function is still running.
-func (t *Debounce) Start() {
+// Run starts running our op, but not if the function is still running.
+func (t *Debounce) Run() {
 	t.Lock()
 	defer t.Unlock()
 
@@ -65,7 +65,7 @@ func (t *Debounce) Start() {
 			t.queued = false
 
 			t.Unlock()
-			t.Start()
+			t.Run()
 
 			return
 		}
