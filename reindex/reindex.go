@@ -27,7 +27,7 @@ import (
 	"log/slog"
 	"os/exec"
 	"strings"
-	"time"
+	"sync"
 
 	"github.com/wtsi-hgi/go-softpack-builder/config"
 )
@@ -39,9 +39,19 @@ type Builder interface {
 
 type Reindexer struct {
 	conf *config.Config
+	sync.Mutex
 }
 
+func New(conf *config.Config) *Reindexer {
+	return &Reindexer{conf: conf}
+}
+
+// Reindex runs `spack buildcache update-index` and logs when the reindex started and finished.
 func (r *Reindexer) Reindex() {
+	// start := time.Now()
+	r.Lock()
+	defer r.Unlock()
+
 	cmd := exec.Command(r.conf.Spack.Path, "buildcache", "update-index", "--", r.conf.S3.BinaryCache) //nolint:gosec
 	out, err := cmd.CombinedOutput()
 
@@ -60,50 +70,46 @@ func (r *Reindexer) Reindex() {
 	}
 }
 
-func New(conf *config.Config) *Reindexer {
-	return &Reindexer{conf: conf}
-}
+// // Scheduler periodically updates the Spack buildcache index.
+// type Scheduler struct {
+// 	*Debounce
+// 	conf    *config.Config
+// 	builder Builder
+// }
 
-// Scheduler periodically updates the Spack buildcache index.
-type Scheduler struct {
-	*Throttler
-	conf    *config.Config
-	builder Builder
-}
+// // NewScheduler returns a scheduler that can update the Spack buildcache index
+// // periodically.
+// func NewScheduler(conf *config.Config, builder Builder) *Scheduler {
+// 	reindex := func() {
+// 		cmd := exec.Command(conf.Spack.Path, "buildcache", "update-index", "--", conf.S3.BinaryCache) //nolint:gosec
+// 		out, err := cmd.CombinedOutput()
 
-// NewScheduler returns a scheduler that can update the Spack buildcache index
-// periodically.
-func NewScheduler(conf *config.Config, builder Builder) *Scheduler {
-	reindex := func() {
-		cmd := exec.Command(conf.Spack.Path, "buildcache", "update-index", "--", conf.S3.BinaryCache) //nolint:gosec
-		out, err := cmd.CombinedOutput()
+// 		var outstr, errstr string
 
-		var outstr, errstr string
+// 		if out != nil {
+// 			outstr = string(out)
+// 		}
 
-		if out != nil {
-			outstr = string(out)
-		}
+// 		if err != nil {
+// 			errstr = err.Error()
+// 		}
 
-		if err != nil {
-			errstr = err.Error()
-		}
+// 		if err != nil || strings.Contains(outstr, "Error") {
+// 			slog.Error("spack reindex failed", "err", errstr, "out", outstr)
+// 		}
+// 	}
 
-		if err != nil || strings.Contains(outstr, "Error") {
-			slog.Error("spack reindex failed", "err", errstr, "out", outstr)
-		}
-	}
+// 	s := &Scheduler{
+// 		Debounce: NewDebounce(reindex),
+// 		conf:     conf,
+// 		builder:  builder,
+// 	}
 
-	s := &Scheduler{
-		Throttler: NewThrottle(reindex, hoursToDuration(conf.Spack.ReindexHours), true),
-		conf:      conf,
-		builder:   builder,
-	}
+// 	builder.SetPostBuildCallback(s.Signal)
 
-	builder.SetPostBuildCallback(s.Signal)
+// 	return s
+// }
 
-	return s
-}
-
-func hoursToDuration(hours float64) time.Duration {
-	return time.Duration(hours * float64(time.Hour))
-}
+// func hoursToDuration(hours float64) time.Duration {
+// 	return time.Duration(hours * float64(time.Hour))
+// }
