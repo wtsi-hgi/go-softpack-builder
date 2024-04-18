@@ -32,6 +32,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -97,8 +98,15 @@ func TestBuilder(t *testing.T) {
 		So(err, ShouldBeNil)
 
 		var bcbCount atomic.Uint64
+
+		bcbWait := 0 * time.Millisecond
+
 		bcb := func() {
+			<-time.After(bcbWait)
 			bcbCount.Add(1)
+			if bcbWait > 0 {
+				slog.Error("bcb finished")
+			}
 		}
 
 		builder.SetPostBuildCallback(bcb)
@@ -357,6 +365,8 @@ packages:
 
 		Convey("Build logs an error if the run fails", func() {
 			mwr.Fail = true
+			bcbWait = 500 * time.Millisecond
+
 			err := builder.Build(def)
 			So(err, ShouldBeNil)
 
@@ -369,8 +379,15 @@ packages:
 			})
 			So(ok, ShouldBeTrue)
 
-			So(logWriter.String(), ShouldContainSubstring,
+			<-time.After(bcbWait)
+
+			logLines := strings.Split(logWriter.String(), "\n")
+			So(len(logLines), ShouldEqual, 3)
+
+			So(logLines[0], ShouldContainSubstring,
 				"msg=\"Async part of build failed\" err=\""+ErrBuildFailed+"\" s3Path=some_path/"+def.getS3Path())
+
+			So(logLines[1], ShouldContainSubstring, "finished")
 
 			data, ok := mc.GetFile(filepath.Join(def.getRepoPath(), core.BuilderOut))
 			So(ok, ShouldBeTrue)
