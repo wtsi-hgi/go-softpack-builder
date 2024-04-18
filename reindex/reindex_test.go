@@ -95,30 +95,14 @@ func TestReindex(t *testing.T) {
 
 		fb := &fakeBuilder{}
 
+		var logWriter tests.ConcurrentStringBuilder
+
+		slog.SetDefault(slog.New(slog.NewTextHandler(&logWriter, &slog.HandlerOptions{Level: slog.LevelInfo})))
+
 		r := New(&conf)
-
-		// SkipConvey("We can schedule the reindex job", func() {
-		// 	s := NewScheduler(&conf, fb)
-		// 	s.Start()
-		// 	started := fb.pretendBuildHappened()
-		// 	defer s.Stop()
-
-		// 	index := getIndex(cacheDir, started)
-		// 	So(index, ShouldContainSubstring, "tr6lezmi6onfz2txkzowkh4qylmec2lk")
-
-		// 	sig2 := "linux-ubuntu22.04-x86_64_v3-gcc-11.4.0-curl-8.4.0-dnenyfmmx3fbiksufzhmb4qwjcvej7jg.spec.json.sig"
-		// 	err = copy.Copy(sig2, filepath.Join(cacheDir, sig2))
-		// 	So(err, ShouldBeNil)
-
-		// 	lastBuild := fb.pretendBuildHappened()
-		// 	<-time.After(hoursToDuration(conf.Spack.ReindexHours))
-		// 	index = getIndex(cacheDir, lastBuild)
-		// 	So(index, ShouldContainSubstring, "dnenyfmmx3fbiksufzhmb4qwjcvej7jg")
-		// })
+		fb.SetPostBuildCallback(r.Reindex)
 
 		Convey("The cache is reindexed immediately after a build", func() {
-			fb.SetPostBuildCallback(r.Reindex)
-
 			buildFinished := fb.pretendBuildHappened()
 
 			index := getIndex(cacheDir, buildFinished)
@@ -134,13 +118,6 @@ func TestReindex(t *testing.T) {
 		})
 
 		Convey("Two builds finishing at the same time results in 2 sequential reindexes", func() {
-			fb.SetPostBuildCallback(r.Reindex)
-
-			// finishTimesCh := make(chan time.Time, 2)
-
-			var logWriter tests.ConcurrentStringBuilder
-			slog.SetDefault(slog.New(slog.NewTextHandler(&logWriter, &slog.HandlerOptions{Level: slog.LevelInfo})))
-
 			var wg sync.WaitGroup
 
 			for i := 0; i < 2; i++ {
@@ -154,66 +131,36 @@ func TestReindex(t *testing.T) {
 
 			wg.Wait()
 
-			// slog.Info("Reindex started", "id", "foo")
-
-			// time=2024-04-16T14:18:56.808+01:00 level=INFO msg="Reindex started" id=foo
-			logLines := strings.Split(logWriter.String(), "\n")
+			logLines := strings.Split(strings.TrimSuffix(logWriter.String(), "\n"), "\n")
 
 			So(len(logLines), ShouldEqual, 4)
 
 			for i, line := range logLines {
 				if i%2 == 0 {
-					So(line, ShouldContainSubstring, "Reindex started")
+					So(line, ShouldContainSubstring, "reindex started")
 				} else {
-					So(line, ShouldContainSubstring, "Reindex finished")
+					So(line, ShouldContainSubstring, "reindex finished")
 				}
 			}
 		})
 
-		// SkipConvey("Index updates don't happen unless a build occurred recently", func() {
-		// 	s := NewScheduler(&conf, fb)
-		// 	s.Start()
-		// 	started := time.Now()
-		// 	defer s.Stop()
+		Convey("Spack errors are logged", func() {
+			conf.S3.BinaryCache = "/bad"
+			started := fb.pretendBuildHappened()
 
-		// 	index := getIndex(cacheDir, started)
-		// 	So(index, ShouldBeBlank)
+			getIndex(cacheDir, started)
+			So(logWriter.String(), ShouldContainSubstring, `level=ERROR msg="spack reindex failed"`)
+			So(logWriter.String(), ShouldContainSubstring, "file:///bad/build_cache: [Errno 2] No such file or directory")
+		})
 
-		// 	lastBuild := fb.pretendBuildHappened()
-		// 	<-time.After(hoursToDuration(conf.Spack.ReindexHours))
-		// 	index = getIndex(cacheDir, lastBuild)
-		// 	So(index, ShouldNotBeBlank)
-		// })
+		Convey("An error is logged when Spack isn't available", func() {
+			conf.Spack.Path = "/non-existent"
+			started := fb.pretendBuildHappened()
 
-		// Convey("Spack errors are logged", func() {
-		// 	var logWriter tests.ConcurrentStringBuilder
-		// 	slog.SetDefault(slog.New(slog.NewTextHandler(&logWriter, nil)))
-
-		// 	conf.S3.BinaryCache = "/bad"
-		// 	s := NewScheduler(&conf, fb)
-		// 	s.Start()
-		// 	started := fb.pretendBuildHappened()
-		// 	defer s.Stop()
-
-		// 	getIndex(cacheDir, started)
-		// 	So(logWriter.String(), ShouldContainSubstring, `level=ERROR msg="spack reindex failed"`)
-		// 	So(logWriter.String(), ShouldContainSubstring, "file:///bad/build_cache: [Errno 2] No such file or directory")
-		// })
-
-		// Convey("An error is logged when Spack isn't available", func() {
-		// 	var logWriter tests.ConcurrentStringBuilder
-		// 	slog.SetDefault(slog.New(slog.NewTextHandler(&logWriter, nil)))
-
-		// 	conf.Spack.Path = "/non-existent"
-		// 	s := NewScheduler(&conf, fb)
-		// 	s.Start()
-		// 	started := fb.pretendBuildHappened()
-		// 	defer s.Stop()
-
-		// 	getIndex(cacheDir, started)
-		// 	So(logWriter.String(), ShouldContainSubstring, `level=ERROR msg="spack reindex failed"`)
-		// 	So(logWriter.String(), ShouldContainSubstring, "fork/exec /non-existent: no such file or directory")
-		// })
+			getIndex(cacheDir, started)
+			So(logWriter.String(), ShouldContainSubstring, `level=ERROR msg="spack reindex failed"`)
+			So(logWriter.String(), ShouldContainSubstring, "fork/exec /non-existent: no such file or directory")
+		})
 	})
 }
 

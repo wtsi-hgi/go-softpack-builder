@@ -55,8 +55,10 @@ func New(conf *config.Config) *Reindexer {
 // Logs when the reindex actually starts running, and when it ends, or if it
 // fails.
 func (r *Reindexer) Reindex() {
-	// r.Lock()
-	// defer r.Unlock()
+	r.Lock()
+	defer r.Unlock()
+
+	slog.Info("reindex started")
 
 	cmd := exec.Command(r.conf.Spack.Path, "buildcache", "update-index", "--", r.conf.S3.BinaryCache) //nolint:gosec
 	out, err := cmd.CombinedOutput()
@@ -74,6 +76,8 @@ func (r *Reindexer) Reindex() {
 	if err != nil || strings.Contains(outstr, "Error") {
 		slog.Error("spack reindex failed", "err", errstr, "out", outstr)
 	}
+
+	slog.Info("reindex finished")
 }
 
 // // Scheduler periodically updates the Spack buildcache index.
