@@ -67,6 +67,34 @@ func TestInstall(t *testing.T) {
 			So(dest, ShouldEqual, wrapperScript)
 		}
 	})
+
+	Convey("makeDirectory works with relative paths", t, func() {
+		tmpDir := t.TempDir()
+		err := os.Chdir(tmpDir)
+		So(err, ShouldBeNil)
+
+		baseDir := filepath.Join(tmpDir, "base")
+		err = os.MkdirAll(baseDir, perms)
+		So(err, ShouldBeNil)
+
+		leafDir := filepath.Join("base", "sub1", "sub2")
+
+		err = makeDirectory(leafDir, baseDir)
+		So(err, ShouldBeNil)
+
+		absLeafDir, err := filepath.Abs(leafDir)
+		So(err, ShouldBeNil)
+
+		_, err = os.Stat(absLeafDir)
+		So(err, ShouldBeNil)
+
+		Convey("unless baseDir is not a parent of a leafDir", func() {
+			leafDir = filepath.Join("sub1", "sub2")
+			err = makeDirectory(leafDir, baseDir)
+			So(err, ShouldNotBeNil)
+			//So(errors.Is(err))
+		})
+	})
 }
 
 func readFile(t *testing.T, path string) string {

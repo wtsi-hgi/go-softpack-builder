@@ -98,7 +98,16 @@ func ModuleDirFromName(moduleInstallBase, path, name string) string {
 // makeDirectory does a MkdirAll for leafDir, and then makes sure it and it's
 // parents up to baseDir are world accesible.
 func makeDirectory(leafDir, baseDir string) error {
-	if err := os.MkdirAll(leafDir, perms); err != nil {
+	leafDir, err := filepath.Abs(leafDir)
+	if err != nil {
+		return err
+	}
+
+	if baseDir, err = filepath.Abs(baseDir); err != nil {
+		return err
+	}
+
+	if err = os.MkdirAll(leafDir, perms); err != nil {
 		return err
 	}
 
