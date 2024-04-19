@@ -27,7 +27,8 @@ import (
 	"sync"
 )
 
-// Debounce lets you run a function unless it is already running.
+// Debounce lets you run a function unless it is already running, queueing a run
+// after any existing run.
 type Debounce struct {
 	op      func()
 	running bool
@@ -35,14 +36,16 @@ type Debounce struct {
 	sync.Mutex
 }
 
-// NewDebounce returns a Debounce.
-func NewDebounce(op func()) *Debounce {
+// New returns a Debounce.
+func New(op func()) *Debounce {
 	return &Debounce{
 		op: op,
 	}
 }
 
-// Run starts running our op, but not if the function is still running.
+// Run starts running our op, but not if the function is still running. Instead,
+// a single run will start after the existing one completes (regardless of how
+// many Run()s were called during the existing run).
 func (t *Debounce) Run() {
 	t.Lock()
 	defer t.Unlock()

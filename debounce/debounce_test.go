@@ -48,7 +48,7 @@ func TestDebounce(t *testing.T) {
 		}
 
 		Convey("Debounce runs long-running tasks with no overlap", func() {
-			d := NewDebounce(throttleOp)
+			d := New(throttleOp)
 
 			var wg sync.WaitGroup
 
