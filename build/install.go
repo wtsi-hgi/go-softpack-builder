@@ -27,12 +27,15 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/wtsi-hgi/go-softpack-builder/core"
+	"github.com/wtsi-hgi/go-softpack-builder/internal"
 )
 
 const (
 	ScriptsDirSuffix = "-scripts"
+	ErrMakeDirectory = internal.Error("base not parent of leaf")
 
 	perms = 0755
 	flags = os.O_EXCL | os.O_CREATE | os.O_WRONLY
@@ -105,6 +108,10 @@ func makeDirectory(leafDir, baseDir string) error {
 
 	if baseDir, err = filepath.Abs(baseDir); err != nil {
 		return err
+	}
+
+	if !strings.HasPrefix(leafDir, baseDir) {
+		return ErrMakeDirectory
 	}
 
 	if err = os.MkdirAll(leafDir, perms); err != nil {

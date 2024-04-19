@@ -104,6 +104,7 @@ func TestBuilder(t *testing.T) {
 		bcb := func() {
 			<-time.After(bcbWait)
 			bcbCount.Add(1)
+
 			if bcbWait > 0 {
 				slog.Error("bcb finished")
 			}

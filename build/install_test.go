@@ -24,6 +24,7 @@
 package build
 
 import (
+	"errors"
 	"io"
 	"os"
 	"path/filepath"
@@ -92,7 +93,7 @@ func TestInstall(t *testing.T) {
 			leafDir = filepath.Join("sub1", "sub2")
 			err = makeDirectory(leafDir, baseDir)
 			So(err, ShouldNotBeNil)
-			//So(errors.Is(err))
+			So(errors.Is(err, ErrMakeDirectory), ShouldBeTrue)
 		})
 	})
 }
