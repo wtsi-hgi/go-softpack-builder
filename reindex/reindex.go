@@ -30,6 +30,7 @@ import (
 	"sync"
 
 	"github.com/wtsi-hgi/go-softpack-builder/config"
+	"github.com/wtsi-hgi/go-softpack-builder/debounce"
 )
 
 // Builder can tell us when a build takes place.
@@ -38,12 +39,16 @@ type Builder interface {
 }
 
 type Reindexer struct {
-	conf *config.Config
+	conf     *config.Config
+	debounce *debounce.Debounce
 	sync.Mutex
 }
 
 func New(conf *config.Config) *Reindexer {
-	return &Reindexer{conf: conf}
+	r := &Reindexer{conf: conf}
+	r.debounce = debounce.New(r.reindexOp)
+
+	return r
 }
 
 // Reindex runs `spack buildcache update-index` on the configured S3
@@ -54,10 +59,7 @@ func New(conf *config.Config) *Reindexer {
 //
 // Logs when the reindex actually starts running, and when it ends, or if it
 // fails.
-func (r *Reindexer) Reindex() {
-	r.Lock()
-	defer r.Unlock()
-
+func (r *Reindexer) reindexOp() {
 	slog.Info("reindex started")
 
 	cmd := exec.Command(r.conf.Spack.Path, "buildcache", "update-index", "--", r.conf.S3.BinaryCache) //nolint:gosec
@@ -78,4 +80,8 @@ func (r *Reindexer) Reindex() {
 	}
 
 	slog.Info("reindex finished")
+}
+
+func (r *Reindexer) Reindex() {
+	r.debounce.Run()
 }

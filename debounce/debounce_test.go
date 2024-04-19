@@ -24,7 +24,6 @@
 package debounce
 
 import (
-	"sync"
 	"testing"
 	"time"
 
@@ -50,18 +49,15 @@ func TestDebounce(t *testing.T) {
 		Convey("Debounce runs long-running tasks with no overlap", func() {
 			d := New(throttleOp)
 
-			var wg sync.WaitGroup
-
 			for i := 0; i < 3; i++ {
-				wg.Add(1)
-
 				go func() {
-					defer wg.Done()
 					d.Run()
 				}()
 			}
 
-			wg.Wait()
+			d.Wait()
+
+			So(counter, ShouldEqual, 2)
 
 			start1 := <-startTimes
 			start2 := <-startTimes
@@ -71,7 +67,6 @@ func TestDebounce(t *testing.T) {
 			So(start2, ShouldHappenAfter, start1)
 			So(start2, ShouldHappenAfter, end1)
 			So(end2, ShouldHappenAfter, end1)
-			So(counter, ShouldEqual, 2)
 		})
 	})
 }

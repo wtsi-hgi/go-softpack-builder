@@ -33,6 +33,7 @@ type Debounce struct {
 	op      func()
 	running bool
 	queued  bool
+	wg      sync.WaitGroup
 	sync.Mutex
 }
 
@@ -46,33 +47,40 @@ func New(op func()) *Debounce {
 // Run starts running our op, but not if the function is still running. Instead,
 // a single run will start after the existing one completes (regardless of how
 // many Run()s were called during the existing run).
-func (t *Debounce) Run() {
-	t.Lock()
-	defer t.Unlock()
+func (d *Debounce) Run() {
+	d.Lock()
+	defer d.Unlock()
 
-	if t.running {
-		t.queued = true
+	if d.running {
+		d.queued = true
 
 		return
 	}
 
-	t.running = true
+	d.running = true
+	d.wg.Add(1)
 
 	go func() {
-		t.op()
+		defer d.wg.Done()
+		d.op()
 
-		t.Lock()
-		t.running = false
+		d.Lock()
+		d.running = false
 
-		if t.queued {
-			t.queued = false
+		if d.queued {
+			d.queued = false
 
-			t.Unlock()
-			t.Run()
+			d.Unlock()
+			d.Run()
 
 			return
 		}
 
-		t.Unlock()
+		d.Unlock()
 	}()
+}
+
+// waits until all operations complete.
+func (d *Debounce) Wait() {
+	d.wg.Wait()
 }

@@ -117,10 +117,10 @@ func TestReindex(t *testing.T) {
 			So(index, ShouldContainSubstring, "dnenyfmmx3fbiksufzhmb4qwjcvej7jg")
 		})
 
-		Convey("Two builds finishing at the same time results in 2 sequential reindexes", func() {
+		Convey("Three builds finishing at the same time results in 2 sequential reindexes", func() {
 			var wg sync.WaitGroup
 
-			for i := 0; i < 2; i++ {
+			for i := 0; i < 3; i++ {
 				wg.Add(1)
 
 				go func() {
@@ -130,6 +130,7 @@ func TestReindex(t *testing.T) {
 			}
 
 			wg.Wait()
+			r.debounce.Wait()
 
 			logLines := strings.Split(strings.TrimSuffix(logWriter.String(), "\n"), "\n")
 
