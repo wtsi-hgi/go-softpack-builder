@@ -33,14 +33,17 @@ type Debounce struct {
 	op      func()
 	running bool
 	queued  bool
-	wg      sync.WaitGroup
+	opRunCh chan struct{}
+
+	wg sync.WaitGroup
 	sync.Mutex
 }
 
 // New returns a Debounce.
 func New(op func()) *Debounce {
 	return &Debounce{
-		op: op,
+		op:      op,
+		opRunCh: make(chan struct{}),
 	}
 }
 
@@ -60,27 +63,40 @@ func (d *Debounce) Run() {
 	d.running = true
 	d.wg.Add(1)
 
-	go func() {
-		defer d.wg.Done()
-		d.op()
+	if d.opRunCh != nil {
+		close(d.opRunCh)
+		d.opRunCh = nil
+	}
 
-		d.Lock()
-		d.running = false
-
-		if d.queued {
-			d.queued = false
-
-			d.Unlock()
-			d.Run()
-
-			return
-		}
-
-		d.Unlock()
-	}()
+	go d.runOpAndRerunIfQueued()
 }
 
-// waits until all operations complete.
+func (d *Debounce) runOpAndRerunIfQueued() {
+	defer d.wg.Done()
+	d.op()
+
+	d.Lock()
+	d.running = false
+
+	if d.queued {
+		d.queued = false
+
+		d.Unlock()
+		d.Run()
+
+		return
+	}
+
+	d.Unlock()
+}
+
+// Wait waits until all operations complete. Also waits until at least 1
+// operation has run for this Debounce.
 func (d *Debounce) Wait() {
+	if d.opRunCh != nil {
+		<-d.opRunCh
+	}
+
 	d.wg.Wait()
+	d.opRunCh = make(chan struct{})
 }

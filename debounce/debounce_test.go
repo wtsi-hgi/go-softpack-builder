@@ -67,6 +67,18 @@ func TestDebounce(t *testing.T) {
 			So(start2, ShouldHappenAfter, start1)
 			So(start2, ShouldHappenAfter, end1)
 			So(end2, ShouldHappenAfter, end1)
+
+			Convey("and Wait still works after first use", func() {
+				for i := 0; i < 3; i++ {
+					go func() {
+						d.Run()
+					}()
+				}
+
+				d.Wait()
+
+				So(counter, ShouldEqual, 4)
+			})
 		})
 	})
 }
