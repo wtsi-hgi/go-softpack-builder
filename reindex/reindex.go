@@ -51,14 +51,7 @@ func New(conf *config.Config) *Reindexer {
 	return r
 }
 
-// Reindex runs `spack buildcache update-index` on the configured S3
-// BinaryCache.
-//
-// If a reindex is currently running, queues the reindex until after the current
-// run.
-//
-// Logs when the reindex actually starts running, and when it ends, or if it
-// fails.
+// reindexOp does the actual work of Reindex().
 func (r *Reindexer) reindexOp() {
 	slog.Info("reindex started")
 
@@ -82,6 +75,14 @@ func (r *Reindexer) reindexOp() {
 	slog.Info("reindex finished")
 }
 
+// Reindex runs `spack buildcache update-index` on the configured S3
+// BinaryCache.
+//
+// If a reindex is currently running, queues the reindex until after the current
+// run.
+//
+// Logs when the reindex actually starts running, and when it ends, or if it
+// fails.
 func (r *Reindexer) Reindex() {
 	r.debounce.Run()
 }
