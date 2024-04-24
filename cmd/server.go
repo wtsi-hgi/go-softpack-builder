@@ -143,9 +143,9 @@ past reindexHours, and only if a reindex is not still ongoing.
 			die("could not create a builder: %s", err)
 		}
 
-		sch := reindex.NewScheduler(conf, b)
-		sch.Start()
-		defer sch.Stop()
+		r := reindex.New(conf)
+
+		b.SetPostBuildCallback(r.Reindex)
 
 		s := server.New(b, conf)
 		defer s.Stop()

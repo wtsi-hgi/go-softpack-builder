@@ -395,7 +395,7 @@ func (b *Builder) asyncBuild(def *Definition, wrInput, s3Path, singDef string) e
 	if b.postBuild != nil {
 		// if spack ran at all, it might've pushed things to the cache, even if
 		// it didn't succeed or if later steps don't run
-		b.postBuild()
+		go b.postBuild()
 	}
 	b.postBuildMu.RUnlock()
 

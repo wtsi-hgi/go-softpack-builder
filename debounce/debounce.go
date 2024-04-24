@@ -21,68 +21,86 @@
  * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  ******************************************************************************/
 
-package reindex
+package debounce
 
 import (
-	"log/slog"
-	"os/exec"
-	"strings"
 	"sync"
-
-	"github.com/wtsi-hgi/go-softpack-builder/config"
-	"github.com/wtsi-hgi/go-softpack-builder/debounce"
 )
 
-// Builder can tell us when a build takes place.
-type Builder interface {
-	SetPostBuildCallback(func())
-}
+// Debounce lets you run a function unless it is already running, queueing a run
+// after any existing run.
+type Debounce struct {
+	op      func()
+	running bool
+	queued  bool
+	opRunCh chan struct{}
 
-type Reindexer struct {
-	conf     *config.Config
-	debounce *debounce.Debounce
+	wg sync.WaitGroup
 	sync.Mutex
 }
 
-func New(conf *config.Config) *Reindexer {
-	r := &Reindexer{conf: conf}
-	r.debounce = debounce.New(r.reindexOp)
-
-	return r
+// New returns a Debounce.
+func New(op func()) *Debounce {
+	return &Debounce{
+		op:      op,
+		opRunCh: make(chan struct{}),
+	}
 }
 
-// reindexOp does the actual work of Reindex().
-func (r *Reindexer) reindexOp() {
-	slog.Info("reindex started")
+// Run starts running our op, but not if the function is still running. Instead,
+// a single run will start after the existing one completes (regardless of how
+// many Run()s were called during the existing run).
+func (d *Debounce) Run() {
+	d.Lock()
+	defer d.Unlock()
 
-	cmd := exec.Command(r.conf.Spack.Path, "buildcache", "update-index", "--", r.conf.S3.BinaryCache) //nolint:gosec
-	out, err := cmd.CombinedOutput()
+	if d.running {
+		d.queued = true
 
-	var outstr, errstr string
-
-	if out != nil {
-		outstr = string(out)
+		return
 	}
 
-	if err != nil {
-		errstr = err.Error()
+	d.running = true
+	d.wg.Add(1)
+
+	if d.opRunCh != nil {
+		close(d.opRunCh)
+		d.opRunCh = nil
 	}
 
-	if err != nil || strings.Contains(outstr, "Error") {
-		slog.Error("spack reindex failed", "err", errstr, "out", outstr)
-	}
-
-	slog.Info("reindex finished")
+	go d.runOpAndRerunIfQueued()
 }
 
-// Reindex runs `spack buildcache update-index` on the configured S3
-// BinaryCache.
-//
-// If a reindex is currently running, queues the reindex until after the current
-// run.
-//
-// Logs when the reindex actually starts running, and when it ends, or if it
-// fails.
-func (r *Reindexer) Reindex() {
-	r.debounce.Run()
+func (d *Debounce) runOpAndRerunIfQueued() {
+	defer d.wg.Done()
+	d.op()
+
+	d.Lock()
+	d.running = false
+
+	if d.queued {
+		d.queued = false
+
+		d.Unlock()
+		d.Run()
+
+		return
+	}
+
+	d.Unlock()
+}
+
+// Wait waits until all operations complete. Also waits until at least 1
+// operation has run for this Debounce.
+func (d *Debounce) Wait() {
+	d.Lock()
+	opRunCh := d.opRunCh
+	d.Unlock()
+
+	if opRunCh != nil {
+		<-opRunCh
+	}
+
+	d.wg.Wait()
+	d.opRunCh = make(chan struct{})
 }
