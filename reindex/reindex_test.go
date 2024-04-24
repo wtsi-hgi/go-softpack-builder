@@ -29,7 +29,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
@@ -115,21 +114,14 @@ func TestReindex(t *testing.T) {
 			buildFinished = fb.pretendBuildHappened()
 			index = getIndex(cacheDir, buildFinished)
 			So(index, ShouldContainSubstring, "dnenyfmmx3fbiksufzhmb4qwjcvej7jg")
+			r.debounce.Wait()
 		})
 
 		Convey("Three builds finishing at the same time results in 2 sequential reindexes", func() {
-			var wg sync.WaitGroup
-
 			for i := 0; i < 3; i++ {
-				wg.Add(1)
-
-				go func() {
-					defer wg.Done()
-					fb.pretendBuildHappened()
-				}()
+				go fb.pretendBuildHappened()
 			}
 
-			wg.Wait()
 			r.debounce.Wait()
 
 			logLines := strings.Split(strings.TrimSuffix(logWriter.String(), "\n"), "\n")
