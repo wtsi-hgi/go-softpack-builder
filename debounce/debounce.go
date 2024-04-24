@@ -93,8 +93,12 @@ func (d *Debounce) runOpAndRerunIfQueued() {
 // Wait waits until all operations complete. Also waits until at least 1
 // operation has run for this Debounce.
 func (d *Debounce) Wait() {
-	if d.opRunCh != nil {
-		<-d.opRunCh
+	d.Lock()
+	opRunCh := d.opRunCh
+	d.Unlock()
+
+	if opRunCh != nil {
+		<-opRunCh
 	}
 
 	d.wg.Wait()
