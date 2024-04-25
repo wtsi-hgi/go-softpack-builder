@@ -146,14 +146,14 @@ EOF
 
 	# Install all the required software
 	. /opt/spack/share/spack/setup-env.sh
-	spack mirror add s3cache "s3://spack"
 	tmpDir="$(mktemp -d)"
 	git clone "`+gmhttp.URL+`" "$tmpDir"
 	git -C "$tmpDir" checkout "`+commitHash+`"
 	spack repo add "$tmpDir"
-	spack buildcache keys --install --trust
 	spack config add "config:install_tree:padded_length:128"
 	spack -e . concretize
+	spack mirror add s3cache "s3://spack"
+	spack buildcache keys --install --trust
 	if bash -c "type -P xvfb-run" > /dev/null; then
 		xvfb-run -a spack -e . install --fail-fast
 	else
