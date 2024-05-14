@@ -7,6 +7,10 @@ Stage: build
 	/home/ubuntu/spack/opt/spack/gpg /opt/spack/opt/spack/gpg
 
 %post
+	# Hack to fix overly long R_LIBS env var (>128K).
+	sed -i 's@item = SetEnv(name, value, trace=self._trace(), force=force, raw=raw)@item = SetEnv(name, value.replace("/opt/software/__spack_path_placeholder__/__spack_path_placeholder__/__spack_path_placeholder__/__spack_path_placeholder__", "") if name == "R_LIBS" else value, trace=self._trace(), force=force, raw=raw)@' /opt/spack/lib/spack/spack/util/environment.py
+	ln -s /opt/software/__spack_path_placeholder__/__spack_path_placeholder__/__spack_path_placeholder__/__spack_path_placeholder__/__spac /__spac
+
 	# Create the manifest file for the installation in /opt/spack-environment
 	mkdir /opt/spack-environment && cd /opt/spack-environment
 	cat << EOF > spack.yaml
