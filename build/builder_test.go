@@ -163,7 +163,7 @@ EOF
 	else
 		spack -e . install --fail-fast
 	fi || {
-		spack -e . buildcache push -a s3cache
+		spack -e . buildcache push -a s3cache $(spack -e . find --format "{name}@{version}/{hash}" | tr '\n' ' ')
 		false
 	}
 	spack -e . buildcache push -a s3cache
