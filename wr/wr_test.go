@@ -50,7 +50,8 @@ func TestWR(t *testing.T) {
 		wrInput, err := SingularityBuildInS3WRInput(s3Path, hash)
 		So(err, ShouldBeNil)
 		So(wrInput, ShouldEqual, `{"cmd": "echo doing build with hash `+hash+`; `+
-			`if sudo singularity build $TMPDIR/singularity.sif singularity.def &> $TMPDIR/builder.out; then `+
+			`if sudo singularity build --bind $TMPDIR:/tmp $TMPDIR/singularity.sif singularity.def `+
+			`&> $TMPDIR/builder.out; then `+
 			`sudo singularity run $TMPDIR/singularity.sif cat /opt/spack-environment/executables > $TMPDIR/executables && `+
 			`sudo singularity run $TMPDIR/singularity.sif cat /opt/spack-environment/spack.lock > $TMPDIR/spack.lock && `+
 			`mv $TMPDIR/singularity.sif $TMPDIR/builder.out $TMPDIR/executables $TMPDIR/spack.lock .; else `+
