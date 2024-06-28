@@ -122,6 +122,37 @@ func TestRemove(t *testing.T) {
 			_, err = os.Stat(scriptsPath)
 			So(err, ShouldWrap, os.ErrNotExist)
 		})
+
+		Convey("Remove() only deletes the environment matching the version specified", func() {
+			response.Data.DeleteEnvironment = &core.EnvironmentResponse{
+				TypeName: core.DeleteMutationSuccess,
+				Message:  "Successfully deleted the environment",
+			}
+
+			newVersion := genRandString(4)
+
+			createTestArtifacts(t, conf, group, env, newVersion)
+
+			modulePath := filepath.Join(conf.Module.ModuleInstallDir, groupsDir, group, env)
+			scriptsPath := filepath.Join(conf.Module.ScriptsInstallDir, groupsDir, group, env)
+			oldScriptsPath := filepath.Join(scriptsPath, version+build.ScriptsDirSuffix)
+			newScriptsPath := filepath.Join(scriptsPath, newVersion+build.ScriptsDirSuffix)
+
+			err := Remove(conf, s3Mock, envPath, version)
+			So(err, ShouldBeNil)
+
+			_, err = os.Stat(filepath.Join(modulePath, version))
+			So(err, ShouldWrap, os.ErrNotExist)
+
+			_, err = os.Stat(filepath.Join(modulePath, newVersion))
+			So(err, ShouldBeNil)
+
+			_, err = os.Stat(oldScriptsPath)
+			So(err, ShouldWrap, os.ErrNotExist)
+
+			_, err = os.Stat(newScriptsPath)
+			So(err, ShouldBeNil)
+		})
 	})
 }
 
@@ -136,13 +167,25 @@ func createTestEnv(t *testing.T) (*config.Config, string, string, string) {
 	env := genRandString(8)
 	version := genRandString(3)
 
+	createTestArtifacts(t, conf, group, env, version)
+
+	return conf, group, env, version
+}
+
+func createTestArtifacts(t *testing.T, conf *config.Config, group, env, version string) {
+	t.Helper()
+
 	modulePath := filepath.Join(conf.Module.ModuleInstallDir, groupsDir, group, env)
-	scriptsPath := filepath.Join(conf.Module.ScriptsInstallDir, groupsDir, group, env, version+build.ScriptsDirSuffix)
+	scriptsPath := filepath.Join(conf.Module.ScriptsInstallDir, groupsDir, group, env)
+
+	createTestModule(t, modulePath, version)
+	createTestImage(t, scriptsPath, version)
+}
+
+func createTestModule(t *testing.T, modulePath, version string) {
+	t.Helper()
 
 	err := os.MkdirAll(modulePath, 0755)
-	So(err, ShouldBeNil)
-
-	err = os.MkdirAll(scriptsPath, 0755)
 	So(err, ShouldBeNil)
 
 	f, err := os.Create(filepath.Join(modulePath, version))
@@ -151,15 +194,22 @@ func createTestEnv(t *testing.T) (*config.Config, string, string, string) {
 	_, err = io.WriteString(f, "A Module File")
 	So(err, ShouldBeNil)
 	So(f.Close(), ShouldBeNil)
+}
 
-	f, err = os.Create(filepath.Join(scriptsPath, core.ImageBasename))
+func createTestImage(t *testing.T, scriptsPath, version string) {
+	t.Helper()
+
+	scriptsPath = filepath.Join(scriptsPath, version+build.ScriptsDirSuffix)
+
+	err := os.MkdirAll(scriptsPath, 0755)
+	So(err, ShouldBeNil)
+
+	f, err := os.Create(filepath.Join(scriptsPath, core.ImageBasename))
 	So(err, ShouldBeNil)
 
 	_, err = io.WriteString(f, "An Image File")
 	So(err, ShouldBeNil)
 	So(f.Close(), ShouldBeNil)
-
-	return conf, group, env, version
 }
 
 func genRandString(length int) string {
