@@ -82,7 +82,7 @@ func Remove(conf *config.Config, s3r s3Remover, envPath, version string) error {
 		return err
 	}
 
-	if err := removeLocalFiles(modulePath, scriptPath); err != nil {
+	if err := removeLocalFiles(modulePath, version, scriptPath); err != nil {
 		return err
 	}
 
@@ -105,12 +105,22 @@ func checkWriteAccess(modulePath, scriptPath string) error {
 	return nil
 }
 
-func removeLocalFiles(modulePath, scriptPath string) error {
-	if err := removeAllNoDescend(modulePath); err != nil {
+func removeLocalFiles(modulePath, version, scriptPath string) error {
+	if err := removeAndParentIfEmpty(modulePath, version); err != nil {
 		return err
 	}
 
 	return removeAllNoDescend(scriptPath)
+}
+
+func removeAndParentIfEmpty(modulePath, version string) error {
+	if err := os.Remove(filepath.Join(modulePath, version)); err != nil {
+		return err
+	}
+
+	os.Remove(modulePath) // error deliberately ignored.
+
+	return nil
 }
 
 func removeAllNoDescend(path string) error {
