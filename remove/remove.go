@@ -118,7 +118,7 @@ func removeAndParentIfEmpty(modulePath, version string) error {
 		return err
 	}
 
-	os.Remove(modulePath)
+	os.Remove(modulePath) // error deliberately ignored.
 
 	return nil
 }
