@@ -26,6 +26,7 @@ package server
 import (
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net"
 	"net/http"
 	"path"
@@ -121,7 +122,7 @@ func (s *Server) Start(l net.Listener) error {
 
 	err := s.resendPendingBuildsIfCoreConfigured()
 	if err != nil {
-		return err
+		slog.Error("error getting core to resend builds", "err", err)
 	}
 
 	return <-errCh
