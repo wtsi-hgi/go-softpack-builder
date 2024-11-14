@@ -167,7 +167,7 @@ func handleResponse(resp *http.Response, err error) error {
 	}
 
 	if r.Error != "" {
-		return errors.New(r.Error) //nolint:err113
+		return errors.New(r.Error) //nolint:goerr113
 	}
 
 	return nil
