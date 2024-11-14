@@ -27,6 +27,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"path/filepath"
@@ -48,43 +49,15 @@ const (
 	ErrNoCoreURL           = "no coreURL specified in config"
 	ErrSomeResendsFailed   = "some queued environments failed to be resent from core to builder"
 
-	graphQLEndpoint = "/graphql"
-	resendEndpoint  = "/resend-pending-builds"
+	resendEndpoint = "/resend-pending-builds"
+	createEndpoint = "/create-environment"
+	deleteEndpoint = "/delete-environment"
 )
-
-type gqlVariables struct {
-	Name        string   `json:"name"`
-	Path        string   `json:"path"`
-	Description string   `json:"description,omitempty"`
-	Packages    Packages `json:"packages,omitempty"`
-}
-
-func newGQLVariables(fullPath, desc string, pkgs Packages) gqlVariables {
-	return gqlVariables{
-		Name:        filepath.Base(fullPath),
-		Path:        filepath.Dir(fullPath),
-		Description: desc,
-		Packages:    pkgs,
-	}
-}
-
-type gqlQuery struct {
-	Variables gqlVariables `json:"variables"`
-	Query     string       `json:"query"`
-}
 
 // EnvironmentResponse is the kind of return value we get from the core.
 type EnvironmentResponse struct {
-	TypeName string `json:"__typename"`
-	Message  string `json:"message"`
-}
-
-// Response represents a response to a GraphQL operation.
-type Response struct {
-	Data struct {
-		CreateEnvironment *EnvironmentResponse `json:"createEnvironment"`
-		DeleteEnvironment *EnvironmentResponse `json:"deleteEnvironment"`
-	} `json:"data"`
+	Message string `json:"message"`
+	Error   string `json:"error"`
 }
 
 // Core is used to interact with a real softpack-core service.
@@ -111,15 +84,6 @@ func toJSON(thing any) io.Reader {
 	return &buf
 }
 
-func (c *Core) doGQLCoreRequest(graphQLPacket io.Reader) error {
-	resp, err := c.doCoreRequest(graphQLEndpoint, graphQLPacket)
-	if err != nil {
-		return err
-	}
-
-	return handleGQLCoreResponse(resp)
-}
-
 func (c *Core) doCoreRequest(endpoint string, content io.Reader) (*http.Response, error) {
 	req, err := http.NewRequestWithContext(
 		context.Background(),
@@ -134,29 +98,6 @@ func (c *Core) doCoreRequest(endpoint string, content io.Reader) (*http.Response
 	req.Header.Add("Content-Type", "application/json")
 
 	return http.DefaultClient.Do(req)
-}
-
-func handleGQLCoreResponse(resp *http.Response) error {
-	var cr Response
-
-	err := json.NewDecoder(resp.Body).Decode(&cr)
-	if err != nil {
-		return err
-	}
-
-	if cr.Data.DeleteEnvironment != nil {
-		if cr.Data.DeleteEnvironment.TypeName != DeleteMutationSuccess {
-			return internal.Error(cr.Data.DeleteEnvironment.Message)
-		}
-	}
-
-	if cr.Data.CreateEnvironment != nil {
-		if cr.Data.CreateEnvironment.TypeName != createMutationSuccess {
-			return internal.Error(cr.Data.CreateEnvironment.Message)
-		}
-	}
-
-	return nil
 }
 
 // ResendResponse is the response that the core service sends when a resend
@@ -193,4 +134,54 @@ func (c *Core) ResendPendingBuilds() error {
 	}
 
 	return nil
+}
+
+type environmentInput struct {
+	Name        string   `json:"name"`
+	Path        string   `json:"path"`
+	Description string   `json:"description"`
+	Packages    Packages `json:"packages"`
+}
+
+// Create contacts the core to schedule an environment build.
+func (c *Core) Create(path, desc string, pkgs Packages) error {
+	return handleResponse(c.doCoreRequest(createEndpoint, toJSON(environmentInput{
+		Name:        filepath.Base(path),
+		Path:        filepath.Dir(path),
+		Description: desc,
+		Packages:    pkgs,
+	})))
+}
+
+func handleResponse(resp *http.Response, err error) error {
+	if err != nil {
+		return err
+	}
+
+	defer resp.Body.Close()
+
+	var r EnvironmentResponse
+
+	if err := json.NewDecoder(resp.Body).Decode(&r); err != nil {
+		return err
+	}
+
+	if r.Error != "" {
+		return errors.New(r.Error) //nolint:err113
+	}
+
+	return nil
+}
+
+type deleteEnvironmentInput struct {
+	Name string `json:"name"`
+	Path string `json:"path"`
+}
+
+// Delete contacts the core to delete an environment.
+func (c *Core) Delete(path string) error {
+	return handleResponse(c.doCoreRequest(deleteEndpoint, toJSON(deleteEnvironmentInput{
+		Name: filepath.Base(path),
+		Path: filepath.Dir(path),
+	})))
 }

@@ -49,19 +49,6 @@ func TestCore(t *testing.T) {
 			},
 		}
 
-		Convey("You can create a gqlQuery", func() {
-			gq := newCreateMutation(path, desc, pkgs)
-			So(gq, ShouldResemble, &gqlQuery{
-				Variables: gqlVariables{
-					Name:        "env",
-					Path:        "users/foo",
-					Description: desc,
-					Packages:    pkgs,
-				},
-				Query: createMutationQuery,
-			})
-		})
-
 		conf, err := config.GetConfig("")
 		if err != nil || conf.CoreURL == "" || conf.ListenURL == "" {
 			_, err = New(conf)
