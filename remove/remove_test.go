@@ -38,7 +38,7 @@ func TestRemove(t *testing.T) {
 
 		envPath := filepath.Join(groupsDir, group, env)
 
-		var response core.Response
+		var response core.EnvironmentResponse
 
 		mockCore := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			json.NewEncoder(w).Encode(response) //nolint:errcheck
@@ -88,9 +88,8 @@ func TestRemove(t *testing.T) {
 		})
 
 		Convey("Remove() call fails if environment is not successfully removed from Core", func() {
-			response.Data.DeleteEnvironment = &core.EnvironmentResponse{
-				TypeName: "EnvironmentNotFoundError",
-				Message:  "No environment with this name found in this location.",
+			response = core.EnvironmentResponse{
+				Error: "No environment with this name found in this location.",
 			}
 
 			err := Remove(conf, s3Mock, envPath, version)
@@ -104,9 +103,8 @@ func TestRemove(t *testing.T) {
 		})
 
 		Convey("Can use Remove() to delete an existing environment", func() {
-			response.Data.DeleteEnvironment = &core.EnvironmentResponse{
-				TypeName: core.DeleteMutationSuccess,
-				Message:  "Successfully deleted the environment",
+			response = core.EnvironmentResponse{
+				Message: "Successfully deleted the environment",
 			}
 
 			modulePath := filepath.Join(conf.Module.ModuleInstallDir, groupsDir, group, env)
@@ -124,9 +122,8 @@ func TestRemove(t *testing.T) {
 		})
 
 		Convey("Remove() only deletes the environment matching the version specified", func() {
-			response.Data.DeleteEnvironment = &core.EnvironmentResponse{
-				TypeName: core.DeleteMutationSuccess,
-				Message:  "Successfully deleted the environment",
+			response = core.EnvironmentResponse{
+				Message: "Successfully deleted the environment",
 			}
 
 			newVersion := genRandString(4)
