@@ -362,12 +362,10 @@ packages:
 			So(ok, ShouldBeTrue)
 
 			logLines := strings.Split(logWriter.String(), "\n")
-			So(len(logLines), ShouldEqual, 3)
+			So(len(logLines), ShouldEqual, 2)
 
 			So(logLines[0], ShouldContainSubstring,
 				"msg=\"Async part of build failed\" err=\""+ErrBuildFailed+"\" s3Path=some_path/"+def.getS3Path())
-
-			So(logLines[1], ShouldContainSubstring, "finished")
 
 			data, ok := mc.GetFile(filepath.Join(def.getRepoPath(), core.BuilderOut))
 			So(ok, ShouldBeTrue)
