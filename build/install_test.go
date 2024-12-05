@@ -75,7 +75,7 @@ func TestInstall(t *testing.T) {
 		So(err, ShouldBeNil)
 
 		baseDir := filepath.Join(tmpDir, "base")
-		err = os.MkdirAll(baseDir, perms)
+		err = os.MkdirAll(baseDir, dirPerms)
 		So(err, ShouldBeNil)
 
 		leafDir := filepath.Join("base", "sub1", "sub2")

@@ -37,8 +37,9 @@ const (
 	ScriptsDirSuffix = "-scripts"
 	ErrMakeDirectory = internal.Error("base not parent of leaf")
 
-	perms = 0644
-	flags = os.O_EXCL | os.O_CREATE | os.O_WRONLY
+	perms    = 0644
+	dirPerms = 0755
+	flags    = os.O_EXCL | os.O_CREATE | os.O_WRONLY
 )
 
 func installModule(scriptInstallBase, moduleInstallBase string, def *Definition, module,
@@ -114,12 +115,12 @@ func makeDirectory(leafDir, baseDir string) error {
 		return ErrMakeDirectory
 	}
 
-	if err = os.MkdirAll(leafDir, perms); err != nil {
+	if err = os.MkdirAll(leafDir, dirPerms); err != nil {
 		return err
 	}
 
 	for leafDir != baseDir {
-		if err := os.Chmod(leafDir, perms); err != nil {
+		if err := os.Chmod(leafDir, dirPerms); err != nil {
 			return err
 		}
 
