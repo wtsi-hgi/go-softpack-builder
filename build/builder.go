@@ -168,9 +168,6 @@ type Builder struct {
 	mu                  sync.Mutex
 	runningEnvironments map[string]bool
 
-	postBuildMu sync.RWMutex
-	postBuild   func()
-
 	statusMu sync.RWMutex
 	statuses map[string]*Status
 
@@ -214,14 +211,6 @@ type templateVars struct {
 	FinalImage      string
 	ExtraExes       []string
 	Packages        []core.Package
-}
-
-// SetPostBuildCallback causes the passed callback to be called after the
-// spack-related parts of a build have completed.
-func (b *Builder) SetPostBuildCallback(cb func()) {
-	b.postBuildMu.Lock()
-	defer b.postBuildMu.Unlock()
-	b.postBuild = cb
 }
 
 // Status returns the status of all known builds.
@@ -390,14 +379,6 @@ func (b *Builder) asyncBuild(def *Definition, wrInput, s3Path, singDef string) e
 	buildDone := time.Now()
 	status.BuildDone = &buildDone
 	b.statusMu.Unlock()
-
-	b.postBuildMu.RLock()
-	if b.postBuild != nil {
-		// if spack ran at all, it might've pushed things to the cache, even if
-		// it didn't succeed or if later steps don't run
-		go b.postBuild()
-	}
-	b.postBuildMu.RUnlock()
 
 	if err != nil || wrStatus != wr.WRJobStatusComplete {
 		b.addLogToRepo(s3Path, def.FullEnvironmentPath())
