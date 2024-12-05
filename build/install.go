@@ -37,7 +37,7 @@ const (
 	ScriptsDirSuffix = "-scripts"
 	ErrMakeDirectory = internal.Error("base not parent of leaf")
 
-	perms = 0755
+	perms = 0644
 	flags = os.O_EXCL | os.O_CREATE | os.O_WRONLY
 )
 
