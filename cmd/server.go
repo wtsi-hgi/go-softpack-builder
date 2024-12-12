@@ -30,7 +30,6 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/wtsi-hgi/go-softpack-builder/build"
 	"github.com/wtsi-hgi/go-softpack-builder/config"
-	"github.com/wtsi-hgi/go-softpack-builder/reindex"
 	"github.com/wtsi-hgi/go-softpack-builder/server"
 )
 
@@ -142,10 +141,6 @@ past reindexHours, and only if a reindex is not still ongoing.
 		if err != nil {
 			die("could not create a builder: %s", err)
 		}
-
-		r := reindex.New(conf)
-
-		b.SetPostBuildCallback(r.Reindex)
 
 		s := server.New(b, conf)
 		defer s.Stop()

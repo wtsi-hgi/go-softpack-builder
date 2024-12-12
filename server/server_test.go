@@ -270,6 +270,7 @@ func TestServerReal(t *testing.T) {
 
 			ok := s.WaitUntilStarted()
 			So(ok, ShouldBeTrue)
+			time.Sleep(time.Second)
 			So(len(mb.Received), ShouldBeGreaterThanOrEqualTo, 1)
 
 			found := false

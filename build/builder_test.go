@@ -33,7 +33,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
-	"sync/atomic"
 	"testing"
 	"time"
 
@@ -96,21 +95,6 @@ func TestBuilder(t *testing.T) {
 
 		builder, err := New(&conf, ms3, mwr)
 		So(err, ShouldBeNil)
-
-		var bcbCount atomic.Uint64
-
-		bcbWait := 0 * time.Millisecond
-
-		bcb := func() {
-			<-time.After(bcbWait)
-			bcbCount.Add(1)
-
-			if bcbWait > 0 {
-				slog.Error("bcb finished")
-			}
-		}
-
-		builder.SetPostBuildCallback(bcb)
 
 		def := getExampleDefinition()
 
@@ -238,8 +222,6 @@ Stage: final
 			err := builder.Build(def)
 			So(err, ShouldBeNil)
 
-			So(bcbCount.Load(), ShouldEqual, 0)
-
 			So(ms3.Def, ShouldEqual, filepath.Join(def.getS3Path(), "singularity.def"))
 			So(ms3.Data, ShouldContainSubstring, "specs:\n  - xxhash@0.8.1 arch=None-None-x86_64_v4\n"+
 				"  - r-seurat@4 arch=None-None-x86_64_v4\n  - py-anndata@3.14 arch=None-None-x86_64_v4\n  view")
@@ -356,21 +338,16 @@ packages:
 
 			So(ms3.SoftpackYML, ShouldEqual, expectedSoftpackYaml)
 			So(ms3.Readme, ShouldContainSubstring, expectedReadmeContent)
-
-			So(bcbCount.Load(), ShouldEqual, 1)
 		})
 
 		Convey("Build returns an error if the upload fails", func() {
 			ms3.Fail = true
 			err := builder.Build(def)
 			So(err, ShouldNotBeNil)
-
-			So(bcbCount.Load(), ShouldEqual, 0)
 		})
 
 		Convey("Build logs an error if the run fails", func() {
 			mwr.Fail = true
-			bcbWait = 500 * time.Millisecond
 
 			err := builder.Build(def)
 			So(err, ShouldBeNil)
@@ -384,21 +361,15 @@ packages:
 			})
 			So(ok, ShouldBeTrue)
 
-			<-time.After(bcbWait)
-
 			logLines := strings.Split(logWriter.String(), "\n")
-			So(len(logLines), ShouldEqual, 3)
+			So(len(logLines), ShouldEqual, 2)
 
 			So(logLines[0], ShouldContainSubstring,
 				"msg=\"Async part of build failed\" err=\""+ErrBuildFailed+"\" s3Path=some_path/"+def.getS3Path())
 
-			So(logLines[1], ShouldContainSubstring, "finished")
-
 			data, ok := mc.GetFile(filepath.Join(def.getRepoPath(), core.BuilderOut))
 			So(ok, ShouldBeTrue)
 			So(data, ShouldContainSubstring, "output")
-
-			So(bcbCount.Load(), ShouldEqual, 1)
 		})
 
 		Convey("You can't run the same build simultaneously", func() {
@@ -477,8 +448,6 @@ packages:
 			expectedLog = "\"Async part of build failed\" err=\"an error\\n\""
 
 			So(logWriter.String(), ShouldContainSubstring, expectedLog)
-
-			So(bcbCount.Load(), ShouldEqual, 2)
 		})
 	})
 }
