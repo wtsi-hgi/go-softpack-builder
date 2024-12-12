@@ -261,14 +261,18 @@ Stage: final
 			So(err, ShouldBeNil)
 
 			perm := info.Mode().Perm()
-			So(perm.String(), ShouldEqual, "-rwxr-xr-x")
+			So(perm.String(), ShouldEqual, "-rw-r--r--")
 
 			dir := modulePath
 			for dir != conf.Module.ModuleInstallDir {
 				info, err = os.Stat(dir)
 				So(err, ShouldBeNil)
 				perm = info.Mode().Perm()
-				So(perm&0755, ShouldEqual, 0755)
+				if info.IsDir() {
+					So(perm&0755, ShouldEqual, 0755)
+				} else {
+					So(perm&0755, ShouldEqual, 0644)
+				}
 
 				dir = filepath.Dir(dir)
 			}
@@ -278,7 +282,11 @@ Stage: final
 				info, err = os.Stat(dir)
 				So(err, ShouldBeNil)
 				perm = info.Mode().Perm()
-				So(perm&0755, ShouldEqual, 0755)
+				if info.IsDir() {
+					So(perm&0755, ShouldEqual, 0755)
+				} else {
+					So(perm&0755, ShouldEqual, 0644)
+				}
 
 				dir = filepath.Dir(dir)
 			}
@@ -287,7 +295,7 @@ Stage: final
 			So(err, ShouldBeNil)
 
 			perm = info.Mode().Perm()
-			So(perm.String(), ShouldEqual, "-rwxr-xr-x")
+			So(perm.String(), ShouldEqual, "-rw-r--r--")
 
 			f, err := os.Open(imagePath)
 			So(err, ShouldBeNil)
