@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"path"
 	"path/filepath"
-	"strings"
 
 	"github.com/wtsi-hgi/go-softpack-builder/build"
 	"github.com/wtsi-hgi/go-softpack-builder/config"
@@ -65,7 +65,7 @@ func Remove(conf *config.Config, s3r s3Remover, envPath, version string) error {
 	envDir, envName := filepath.Split(envPath)
 	modulePath := build.ModuleDirFromName(conf.Module.ModuleInstallDir, envDir, envName)
 	scriptPath := build.ScriptsDirFromNameAndVersion(conf.Module.ScriptsInstallDir, envDir, envName, version)
-	s3Path := strings.Join([]string{envPath, version}, "/")
+	s3Path := path.Join(envPath, version)
 
 	if err := checkWriteAccess(modulePath, scriptPath); err != nil {
 		return err
@@ -145,9 +145,9 @@ func removeAllNoDescend(path string) error {
 	return os.Remove(path)
 }
 
-func removeFromS3(s3r s3Remover, path string) error {
+func removeFromS3(s3r s3Remover, path_str string) error {
 	for _, file := range s3BasenamesForDeletion {
-		toRemove := filepath.Join(path, file)
+		toRemove := path.Join(path_str, file)
 
 		slog.Info(fmt.Sprintf("Removing file from S3: %s\n", toRemove))
 
