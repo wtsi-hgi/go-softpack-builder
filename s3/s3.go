@@ -24,12 +24,11 @@
 package s3
 
 import (
-	"errors"
 	"io"
 	"os"
+	"path"
 
 	"github.com/VertebrateResequencing/muxfys"
-	"github.com/minio/minio-go"
 )
 
 // S3 lets you upload data to S3 and retrieve it.
@@ -69,16 +68,35 @@ func (s *S3) OpenFile(source string) (io.ReadCloser, error) {
 	return s.S3Accessor.OpenFile(source, 0)
 }
 
+// RemoveFile removes the given path from S3 after checking it exists.
 func (s *S3) RemoveFile(path string) error {
 	path = s.RemotePath(path)
 
-	err := s.S3Accessor.DeleteFile(path)
-	if err != nil {
-		var errr minio.ErrorResponse
-		if errors.As(err, &errr) && errr.Code == "NoSuchKey" {
-			return os.ErrNotExist
-		}
+	if exists, err := s.FileExists(path); !exists {
+		return os.ErrNotExist
+	} else if err != nil {
+		return err
+	}
+
+	if err := s.DeleteFile(path); err != nil {
+		return err
 	}
 
 	return nil
+}
+
+// FileExists checks whether the given path exists in S3.
+func (s *S3) FileExists(path_str string) (bool, error) {
+	res, err := s.ListEntries(path.Dir(path_str) + "/")
+	if err != nil {
+		return false, err
+	}
+
+	for _, r := range res {
+		if r.Name == path_str {
+			return true, nil
+		}
+	}
+
+	return false, nil
 }
