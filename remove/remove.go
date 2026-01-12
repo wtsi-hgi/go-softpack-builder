@@ -1,11 +1,11 @@
 package remove
 
 import (
-	"errors"
 	"fmt"
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/wtsi-hgi/go-softpack-builder/build"
 	"github.com/wtsi-hgi/go-softpack-builder/config"
@@ -65,6 +65,7 @@ func Remove(conf *config.Config, s3r s3Remover, envPath, version string) error {
 	envDir, envName := filepath.Split(envPath)
 	modulePath := build.ModuleDirFromName(conf.Module.ModuleInstallDir, envDir, envName)
 	scriptPath := build.ScriptsDirFromNameAndVersion(conf.Module.ScriptsInstallDir, envDir, envName, version)
+	s3Path := strings.Join([]string{envPath, version}, "/")
 
 	if err := checkWriteAccess(modulePath, scriptPath); err != nil {
 		return err
@@ -86,7 +87,7 @@ func Remove(conf *config.Config, s3r s3Remover, envPath, version string) error {
 		return err
 	}
 
-	return removeFromS3(s3r, modulePath)
+	return removeFromS3(s3r, s3Path)
 }
 
 func checkWriteAccess(modulePath, scriptPath string) error {
@@ -150,7 +151,7 @@ func removeFromS3(s3r s3Remover, path string) error {
 
 		slog.Info(fmt.Sprintf("Removing file from S3: %s\n", toRemove))
 
-		if err := s3r.RemoveFile(toRemove); err != nil && !errors.Is(err, os.ErrNotExist) {
+		if err := s3r.RemoveFile(toRemove); err != nil {
 			return err
 		}
 	}

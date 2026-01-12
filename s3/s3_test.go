@@ -80,5 +80,13 @@ func TestS3(t *testing.T) {
 				})
 			})
 		})
+
+		Convey("And can't remove files that don't exist", func() {
+			_, err = s3.OpenFile("/non/existing/path")
+			So(err, ShouldNotBeNil)
+
+			err = s3.RemoveFile("/non/existing/path")
+			So(err, ShouldNotBeNil)
+		})
 	})
 }

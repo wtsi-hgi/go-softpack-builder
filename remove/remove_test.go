@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -20,10 +21,24 @@ import (
 
 const groupsDir = "groups"
 
-type mockS3 struct{}
+type mockS3 struct {
+	paths []string
+}
 
-func (mockS3) RemoveFile(_ string) error {
+func (s *mockS3) RemoveFile(path string) error {
+	if exists, err := s.DoesFileExist(path); !exists {
+		return os.ErrNotExist
+	} else if err != nil {
+		return err
+	}
+
+	idx := slices.Index(s.paths, path)
+	s.paths = slices.Delete(s.paths, idx, idx+1)
 	return nil
+}
+
+func (s mockS3) DoesFileExist(path string) (bool, error) { //nolint:unparam
+	return slices.Contains(s.paths, path), nil
 }
 
 func TestRemove(t *testing.T) {
@@ -47,6 +62,7 @@ func TestRemove(t *testing.T) {
 		conf.CoreURL = mockCore.URL
 
 		s3Mock := new(mockS3)
+		populateMockS3(s3Mock, envPath, version)
 
 		Convey("Remove() call fails if the environments module dir or script dir is not removable", func() {
 			for _, p := range [...]string{
@@ -119,6 +135,8 @@ func TestRemove(t *testing.T) {
 
 			_, err = os.Stat(scriptsPath)
 			So(err, ShouldWrap, os.ErrNotExist)
+
+			So(s3Mock.paths, ShouldBeEmpty)
 		})
 
 		Convey("Remove() only deletes the environment matching the version specified", func() {
@@ -149,6 +167,8 @@ func TestRemove(t *testing.T) {
 
 			_, err = os.Stat(newScriptsPath)
 			So(err, ShouldBeNil)
+
+			So(s3Mock.paths, ShouldBeEmpty)
 		})
 	})
 }
@@ -225,4 +245,18 @@ func genRandString(length int) string {
 	}
 
 	return sb.String()
+}
+
+func populateMockS3(s *mockS3, envPath string, version string) {
+	for _, fileName := range [...]string{
+		"executables",
+		"softpack.yml",
+		"spack.lock",
+		"builder.out",
+		"README.md",
+		"singularity.sif",
+		"singularity.def",
+	} {
+		s.paths = append(s.paths, envPath+"/"+version+"/"+fileName)
+	}
 }
