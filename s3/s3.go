@@ -68,10 +68,11 @@ func (s *S3) OpenFile(source string) (io.ReadCloser, error) {
 	return s.S3Accessor.OpenFile(source, 0)
 }
 
+// RemoveFile removes the given path from S3 after checking it exists.
 func (s *S3) RemoveFile(path string) error {
 	path = s.RemotePath(path)
 
-	if exists, err := s.DoesFileExist(path); !exists {
+	if exists, err := s.FileExists(path); !exists {
 		return os.ErrNotExist
 	} else if err != nil {
 		return err
@@ -84,7 +85,8 @@ func (s *S3) RemoveFile(path string) error {
 	return nil
 }
 
-func (s *S3) DoesFileExist(path_str string) (bool, error) {
+// FileExists checks whether the given path exists in S3.
+func (s *S3) FileExists(path_str string) (bool, error) {
 	res, err := s.ListEntries(path.Dir(path_str) + "/")
 	if err != nil {
 		return false, err

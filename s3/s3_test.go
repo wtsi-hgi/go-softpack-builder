@@ -62,7 +62,7 @@ func TestS3(t *testing.T) {
 			So(entries[0].Name, ShouldEqual, basePath+"/"+basename)
 
 			Convey("And then check it exists", func() {
-				exists, err := s3.DoesFileExist(basePath + "/" + basename)
+				exists, err := s3.FileExists(basePath + "/" + basename)
 				So(err, ShouldBeNil)
 				So(exists, ShouldBeTrue)
 
@@ -94,7 +94,7 @@ func TestS3(t *testing.T) {
 			err = s3.RemoveFile("/non/existing/path")
 			So(err, ShouldNotBeNil)
 
-			res, err := s3.DoesFileExist("/non/existing/path")
+			res, err := s3.FileExists("/non/existing/path")
 			So(err, ShouldBeNil)
 			So(res, ShouldBeFalse)
 		})
