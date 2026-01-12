@@ -26,7 +26,7 @@ package s3
 import (
 	"io"
 	"os"
-	"strings"
+	"path/filepath"
 
 	"github.com/VertebrateResequencing/muxfys"
 )
@@ -85,10 +85,7 @@ func (s *S3) RemoveFile(path string) error {
 }
 
 func (s *S3) DoesFileExist(path string) (bool, error) {
-	dir_array := strings.Split(path, "/")
-	parent_path := strings.Join(dir_array[:len(dir_array)-1], "/")
-
-	res, err := s.ListEntries(parent_path + "/")
+	res, err := s.ListEntries(filepath.Dir(path) + "/")
 	if err != nil {
 		return false, err
 	}
