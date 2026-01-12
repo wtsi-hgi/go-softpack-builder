@@ -61,32 +61,42 @@ func TestS3(t *testing.T) {
 			So(len(entries), ShouldEqual, 1)
 			So(entries[0].Name, ShouldEqual, basePath+"/"+basename)
 
-			Convey("And then open it", func() {
-				f, err := s3.OpenFile(basename)
+			Convey("And then check it exists", func() {
+				exists, err := s3.DoesFileExist(basePath + "/" + basename)
 				So(err, ShouldBeNil)
+				So(exists, ShouldBeTrue)
 
-				defer f.Close()
-
-				buf, err := io.ReadAll(f)
-				So(err, ShouldBeNil)
-				So(string(buf), ShouldEqual, testData)
-
-				Convey("And remove it", func() {
-					err = s3.RemoveFile(basename)
+				Convey("And then open it", func() {
+					f, err := s3.OpenFile(basename)
 					So(err, ShouldBeNil)
 
-					_, err = s3.OpenFile(basename)
-					So(err, ShouldNotBeNil)
+					defer f.Close()
+
+					buf, err := io.ReadAll(f)
+					So(err, ShouldBeNil)
+					So(string(buf), ShouldEqual, testData)
+
+					Convey("And remove it", func() {
+						err = s3.RemoveFile(basename)
+						So(err, ShouldBeNil)
+
+						_, err = s3.OpenFile(basename)
+						So(err, ShouldNotBeNil)
+					})
 				})
 			})
 		})
 
-		Convey("And can't remove files that don't exist", func() {
+		Convey("You can't remove files that don't exist", func() {
 			_, err = s3.OpenFile("/non/existing/path")
 			So(err, ShouldNotBeNil)
 
 			err = s3.RemoveFile("/non/existing/path")
 			So(err, ShouldNotBeNil)
+
+			res, err := s3.DoesFileExist("/non/existing/path")
+			So(err, ShouldBeNil)
+			So(res, ShouldBeFalse)
 		})
 	})
 }
