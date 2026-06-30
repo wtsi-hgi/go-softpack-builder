@@ -28,7 +28,7 @@ import (
 	"testing"
 
 	. "github.com/smartystreets/goconvey/convey"
-	c "github.com/wtsi-hgi/go-softpack-builder/core"
+	"github.com/wtsi-hgi/go-softpack-builder/core"
 )
 
 func TestModule(t *testing.T) {
@@ -94,13 +94,14 @@ module help HGI/softpack/groups/hgi/xxhash/0.8.1
 Path to singularity container:
 
 `+"```"+`
-%s/%s%s/%s%s
+%s/%s%s/%s%s/%s
 `+"```",
 			installDir,
 			def.EnvironmentPath,
 			def.EnvironmentName,
 			def.EnvironmentVersion,
-			ScriptsDirSuffix+"/"+c.SingularityDefBasename,
+			ScriptsDirSuffix,
+			core.SingularityDefBasename,
 		))
 	})
 }

@@ -29,7 +29,7 @@ import (
 	"strings"
 	"text/template"
 
-	c "github.com/wtsi-hgi/go-softpack-builder/core"
+	"github.com/wtsi-hgi/go-softpack-builder/core"
 )
 
 //go:embed module.tmpl
@@ -83,7 +83,7 @@ func (d *Definition) ModuleUsage(loadPath, scriptsInstallDir string) string {
 
 	usageTmpl.Execute(&sb, usageData{ //nolint:errcheck
 		ModulePath:      filepath.Join(loadPath, t),
-		SingularityPath: filepath.Join(scriptsInstallDir, t) + ScriptsDirSuffix + "/" + c.SingularityDefBasename,
+		SingularityPath: filepath.Join(scriptsInstallDir, t+ScriptsDirSuffix, core.SingularityDefBasename),
 	})
 
 	return sb.String()
