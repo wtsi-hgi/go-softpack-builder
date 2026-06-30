@@ -28,7 +28,6 @@ import (
 	"testing"
 
 	. "github.com/smartystreets/goconvey/convey"
-	"github.com/wtsi-hgi/go-softpack-builder/core"
 )
 
 func TestModule(t *testing.T) {
@@ -71,11 +70,10 @@ prepend-path PATH "%s/%s/%s/%s-scripts"
 	Convey("Given a Definition, you can generate a Usage for a module file", t, func() {
 		// moduleLoadPath and installDir would come from our config yml
 		moduleLoadPath := "HGI/softpack"
-		installDir := "/software/modules/HGI/softpack"
 
 		def := getExampleDefinition()
-		usageFileData := def.ModuleUsage(moduleLoadPath, installDir)
-		So(usageFileData, ShouldEqual, fmt.Sprintf(`# Usage
+		usageFileData := def.ModuleUsage(moduleLoadPath, "/software/hgi/softpack/installs")
+		So(usageFileData, ShouldEqual, `# Usage
 
 To use this environment, run:
 
@@ -94,14 +92,8 @@ module help HGI/softpack/groups/hgi/xxhash/0.8.1
 Path to singularity container:
 
 `+"```"+`
-%s/%s%s/%s%s/%s
+/software/hgi/softpack/installs/groups/hgi/xxhash/0.8.1-scripts/singularity.def
 `+"```",
-			installDir,
-			def.EnvironmentPath,
-			def.EnvironmentName,
-			def.EnvironmentVersion,
-			ScriptsDirSuffix,
-			core.SingularityDefBasename,
-		))
+		)
 	})
 }
