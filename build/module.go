@@ -67,14 +67,22 @@ func (d *Definition) ToModule(installDir string, deps, exes []string) string {
 	return sb.String()
 }
 
+type usageData struct {
+	ModulePath      string
+	SingularityPath string
+}
+
 // ModuleUsage returns a markdown formatted usage that tells a user to module
 // load our environment installed in the given loadPath.
-func (d *Definition) ModuleUsage(loadPath string) string {
+func (d *Definition) ModuleUsage(loadPath, scriptsInstallDir string) string {
 	var sb strings.Builder
 
-	usageTmpl.Execute(&sb, filepath.Join( //nolint:errcheck
-		loadPath, d.EnvironmentPath, d.EnvironmentName, d.EnvironmentVersion,
-	))
+	t := filepath.Join(d.EnvironmentPath, d.EnvironmentName, d.EnvironmentVersion) //nolint:errcheck
+
+	usageTmpl.Execute(&sb, usageData{
+		ModulePath:      filepath.Join(loadPath, t), //nolint:errcheck
+		SingularityPath: filepath.Join(scriptsInstallDir, t) + "-scripts/singularity.sif",
+	})
 
 	return sb.String()
 }

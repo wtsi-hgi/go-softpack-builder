@@ -575,7 +575,7 @@ func SpackLockToSoftPackYML(spackLockData []byte, desc string, exes []string) (s
 }
 
 func (b *Builder) generateAndUploadUsageFile(def *Definition, s3Path string) (string, error) {
-	readme := def.ModuleUsage(b.config.Module.LoadPath)
+	readme := def.ModuleUsage(b.config.Module.LoadPath, b.config.Module.ScriptsInstallDir)
 
 	if err := b.s3.UploadData(strings.NewReader(readme), filepath.Join(s3Path, core.UsageBasename)); err != nil {
 		return "", err
