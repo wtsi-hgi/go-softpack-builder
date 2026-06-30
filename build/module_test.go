@@ -28,6 +28,7 @@ import (
 	"testing"
 
 	. "github.com/smartystreets/goconvey/convey"
+	c "github.com/wtsi-hgi/go-softpack-builder/core"
 )
 
 func TestModule(t *testing.T) {
@@ -99,7 +100,7 @@ Path to singularity container:
 			def.EnvironmentPath,
 			def.EnvironmentName,
 			def.EnvironmentVersion,
-			"-scripts/singularity.sif",
+			ScriptsDirSuffix+"/"+c.SingularityDefBasename,
 		))
 	})
 }
