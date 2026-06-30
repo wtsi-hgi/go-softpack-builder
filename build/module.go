@@ -28,6 +28,8 @@ import (
 	"path/filepath"
 	"strings"
 	"text/template"
+
+	"github.com/wtsi-hgi/go-softpack-builder/core"
 )
 
 //go:embed module.tmpl
@@ -67,14 +69,22 @@ func (d *Definition) ToModule(installDir string, deps, exes []string) string {
 	return sb.String()
 }
 
+type usageData struct {
+	ModulePath      string
+	SingularityPath string
+}
+
 // ModuleUsage returns a markdown formatted usage that tells a user to module
 // load our environment installed in the given loadPath.
-func (d *Definition) ModuleUsage(loadPath string) string {
+func (d *Definition) ModuleUsage(loadPath, scriptsInstallDir string) string {
 	var sb strings.Builder
 
-	usageTmpl.Execute(&sb, filepath.Join( //nolint:errcheck
-		loadPath, d.EnvironmentPath, d.EnvironmentName, d.EnvironmentVersion,
-	))
+	t := filepath.Join(d.EnvironmentPath, d.EnvironmentName, d.EnvironmentVersion)
+
+	usageTmpl.Execute(&sb, usageData{ //nolint:errcheck
+		ModulePath:      filepath.Join(loadPath, t),
+		SingularityPath: filepath.Join(scriptsInstallDir, t+ScriptsDirSuffix, core.SingularityDefBasename),
+	})
 
 	return sb.String()
 }

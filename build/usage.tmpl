@@ -3,7 +3,7 @@
 To use this environment, run:
 
 ```
-module load {{ . }}
+module load {{ .ModulePath }}
 ```
 
 This will usually add your desired software to your PATH. Check the description
@@ -11,5 +11,11 @@ of the environment for more information, which might also be available by
 running:
 
 ```
-module help {{ . }}
+module help {{ .ModulePath }}
+```
+
+Path to singularity container:
+
+```
+{{ .SingularityPath }}
 ```

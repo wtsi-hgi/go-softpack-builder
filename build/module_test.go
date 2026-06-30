@@ -68,11 +68,11 @@ prepend-path PATH "%s/%s/%s/%s-scripts"
 	})
 
 	Convey("Given a Definition, you can generate a Usage for a module file", t, func() {
-		// moduleLoadPath would come from our config yml
+		// moduleLoadPath and installDir would come from our config yml
 		moduleLoadPath := "HGI/softpack"
 
 		def := getExampleDefinition()
-		usageFileData := def.ModuleUsage(moduleLoadPath)
+		usageFileData := def.ModuleUsage(moduleLoadPath, "/software/hgi/softpack/installs")
 		So(usageFileData, ShouldEqual, `# Usage
 
 To use this environment, run:
@@ -87,6 +87,13 @@ running:
 
 `+"```"+`
 module help HGI/softpack/groups/hgi/xxhash/0.8.1
-`+"```\n")
+`+"```"+`
+
+Path to singularity container:
+
+`+"```"+`
+/software/hgi/softpack/installs/groups/hgi/xxhash/0.8.1-scripts/singularity.def
+`+"```",
+		)
 	})
 }
