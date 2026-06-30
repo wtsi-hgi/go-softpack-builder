@@ -79,10 +79,10 @@ type usageData struct {
 func (d *Definition) ModuleUsage(loadPath, scriptsInstallDir string) string {
 	var sb strings.Builder
 
-	t := filepath.Join(d.EnvironmentPath, d.EnvironmentName, d.EnvironmentVersion) //nolint:errcheck
+	t := filepath.Join(d.EnvironmentPath, d.EnvironmentName, d.EnvironmentVersion)
 
-	usageTmpl.Execute(&sb, usageData{
-		ModulePath:      filepath.Join(loadPath, t), //nolint:errcheck
+	usageTmpl.Execute(&sb, usageData{ //nolint:errcheck
+		ModulePath:      filepath.Join(loadPath, t),
 		SingularityPath: filepath.Join(scriptsInstallDir, t) + ScriptsDirSuffix + "/" + c.SingularityDefBasename,
 	})
 
